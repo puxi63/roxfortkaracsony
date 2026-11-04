@@ -751,7 +751,9 @@
         {
           k: 'B', t: 'Immobilus! Megdermesztjük a fát.', w: { loyal: 2, traitor: 1 },
           res(g, d) {
-            if (g.helpersHalf(d)) { g.cur.f1ok = true; return 'Immobilus! A fa megdermed. Az ágak megállnak a levegőben.'; }
+            // The team draws the Immobilus movement together (challenge); without the mini-game the old helper rule holds.
+            const ok = d.wand ? d.wand.ok : g.helpersHalf(d);
+            if (ok) { g.cur.f1ok = true; return 'Immobilus! A fa megdermed. Az ágak megállnak a levegőben.'; }
             g.present().forEach((p) => { if (g.chance(30)) g.wound(p); });
             return 'A varázslat lepattan a kérgéről. Az ágak lecsapnak. Sajgó tagokkal visszahúzódtok.';
           }
@@ -760,6 +762,17 @@
       ]
     },
     kozben: { traitor: [{ id: 'shout', t: 'Rossz pillanatban kiáltasz.', seen: 'rossz pillanatban kiáltott a fűz alatt' }] },
+    // B: everyone present draws the Immobilus movement; the team average decides.
+    async challenge(g, d, tok) {
+      if (d.key !== 'B' || !CE.mini) return;
+      const team = g.present().filter((p) => p.wand);
+      if (!team.length) { d.wand = { ok: false, avg: 0 }; return; }
+      const res = await g.minigame(team, 'palca', { spell: 'Immobilus' });
+      g.check(tok);
+      const avg = team.reduce((a, p) => a + ((res.get(p.id) || {}).score || 0), 0) / team.length;
+      d.wand = { ok: avg >= 0.55, avg };
+      g.log('immobilus', `átlag ${Math.round(avg * 100)}%`);
+    },
     // A: a volunteer pokes the knot. Reflex "Előre!" / "Hátra!"; a hit means another try (at most three).
     async after(g, d, tok) {
       if (d.key !== 'A') return;

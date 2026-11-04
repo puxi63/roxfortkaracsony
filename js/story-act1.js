@@ -7,6 +7,16 @@
   const add = (sc) => { S[sc.id] = sc; };
   const loyal = (g) => g.present().filter((p) => !g.isEvil(p));
   const traitorSecret = (g, cmd, text) => g.traitors().filter((t) => !cmd || g.cmd(t) === cmd).map((t) => ({ to: t, text, kind: 'parancs', style: 'bella' }));
+  // Whether the Imperius-cursed student sneaked out during Act I (the map shows them on the third floor).
+  const traitorSneaked = (g) => {
+    const t = g.players.find((p) => p.traitor);
+    return !!t && g.s.history.some((id) => (CE.SCENES[id] || {}).act === 1 && (g.s.sceneLog[id] || []).some((a) => a.actor === t.id && a.kind === 'sneak'));
+  };
+  // Who casts a drawn spell: the duellist if able, otherwise a random present player with a wand.
+  const wandUser = (g) => {
+    const able = g.present().filter((p) => p.wand && p.status === 'el');
+    return able.find((p) => p.role === 'parbajozo') || (able.length ? g.rng.pick(able) : null);
+  };
 
   // ---------- phone pages (role, origin, loyalty, goal) ----------
 
@@ -37,7 +47,7 @@
       type: 'reflex', prompt, time: 5, bonus: (g) => (g.f.pihent ? 2 : 0),
       options: [
         {
-          k: 'patr', t: 'Expecto Patronum!', hint: (g, p) => `${g.patronusChance(p, mod)}%`, w: { loyal: 3, traitor: 2 },
+          k: 'patr', t: 'Expecto Patronum!', mini: 'ritmus', hint: () => 'utána ritmusra koppintasz', w: { loyal: 3, traitor: 2 },
           res(g, p, c) {
             if (g.castPatronus(p, c, mod)) { g.cur.patronusOk = (g.cur.patronusOk || 0) + 1; return; }
             g.risk(p, c, 50, () => { g.freeze(p); if (extraHurt && g.chance(extraHurt)) g.wound(p); });
@@ -77,6 +87,84 @@
   };
 
   // ---------- PROLOGUE ----------
+
+  // ---------- game intro: what the players can expect (shown once, before the prologue) ----------
+
+  // Slides for the TV: title, short paragraphs and an optional list of [icon, name, description].
+  CE.INTRO = [
+    {
+      title: 'Mi vár rátok?',
+      text: [
+        'Karácsony Roxfortban. A diákok többsége hazautazik, csak néhányan maradtok a kastélyban a tanárokkal. Odakint hóvihar, és valami közeledik.',
+        'Ez egy közös történet. A TV meséli, ti a telefonotokon döntötök. Három felvonás: Szenteste, Karácsony napja, Karácsony éjjele.'
+      ]
+    },
+    {
+      title: 'A telefonod a titkos kártyád',
+      text: [
+        'Rajta van a szereped, a tárgyaid és a titkos lapjaid. Ezek csak addig látszanak, amíg nyomva tartod a gombot. Ne mutasd meg senkinek!',
+        'Ha a telefon rezeg, döntened kell. Figyeld a csíkot a tetején: ha lejár az idő, a véletlen dönt helyetted.'
+      ]
+    },
+    {
+      title: 'Döntések és következmények',
+      text: [
+        'Legtöbbször együtt szavaztok, és a többség dönt. Néha valaki reflektorba kerül, néha önként kell jelentkezni.',
+        'Ha a TV azt kiáltja, hogy hideg árad, csak pár másodperced van.',
+        'Minden döntésnek ára van. A TV megmutatja, mi változott, a Krónikában pedig bármikor visszanézhetitek.'
+      ]
+    },
+    {
+      title: 'Valaki nem az, akinek látszik',
+      text: [
+        'Egyikőtök Imperius-átok alatt áll. Egy halálfaló hangja suttog a fejében, és ezt ő maga is tudja. A többiek nem tudják, ki az. Talán nem is ő az egyetlen.',
+        'Jelenetek közben mindenki titokban választ: segít vagy figyel. Aki figyel, észrevehet valamit. Ha gyanakodtok, megszavazhatjátok, ki kerüljön a pincébe.',
+        'Beszélgessetek, vitatkozzatok, gyanakodjatok! Csak a telefonotok képernyőjét ne mutassátok.'
+      ]
+    },
+    {
+      title: 'Minijátékok',
+      text: ['Néha a telefonod játékká válik. Ilyenkor a TV-n is látszik, mi történik.'],
+      list: [
+        ['✦', 'Expecto Patronum', 'koppints, amikor az ezüst kör felvillan'],
+        ['〰', 'Pálcamozdulat', 'húzd végig az ujjad a számozott pontokon'],
+        ['🐾', 'Lopakodás', 'csak akkor lépj, amikor háttal van'],
+        ['⚡', 'Párbaj', 'várd ki a jelet, ne üss előre'],
+        ['🗺', 'Tekergők Térképe', 'jegyezd meg, ki hol van a TV-n'],
+        ['⚗', 'Ellenméreg', 'csak az tegye az üstbe, akinél a jó hozzávaló van']
+      ]
+    },
+    {
+      title: 'Élet, halál, szellemek',
+      text: [
+        'Mindenkinek három élete van. Aki megdermed vagy haldoklik, azt a többiek megmenthetik, ha időben segítenek.',
+        'Aki meghal, szellemként veletek marad, és tovább követheti a történetet.'
+      ],
+      list: [
+        ['🪶', 'Hűség Dumbledore-hoz', 'ha elég nagy, segítség érkezhet'],
+        ['❄', 'Ostrom', 'ha eléri a nyolcat, nagy a baj'],
+        ['🕯', 'Gyertyák', 'hányan vagytok még életben']
+      ]
+    },
+    {
+      title: 'Ki nyer?',
+      text: [
+        'Ha a halálfalók elérik, amit akarnak, az átkozott diák nyer. Ha megállítjátok őket, Roxfort nyer.',
+        'A legtöbbeteknek titkos személyes célja is van. Sokféle befejezés létezik, és minden játék más: a szerepek, a tárgyak és az események is változnak.',
+        'Ha mindent értetek, nyomjátok meg a telefonon: Készen állok.'
+      ]
+    }
+  ];
+
+  add({
+    id: 'P0', title: 'Mielőtt elkezdjük', place: 'Játékismertető', music: 'lobby',
+    narr: [],
+    async before(g, tok) {
+      if (g.io.intro) await g.io.intro(CE.INTRO, () => tok === g.token);
+    },
+    decision: { type: 'ack', prompt: 'Elolvastad az ismertetőt? Ha igen, nyomd meg:', label: 'Készen állok', time: 90 },
+    next: 'P1'
+  });
 
   add({
     id: 'P1', act: 0, title: 'A lista', place: 'Roxfort, december', clockSet: 9 * 60, music: 'piano',
@@ -285,6 +373,7 @@
           k: 'C', t: 'Beomlasztjuk az alagutat.', w: { loyal: 2, traitor: 0 }, next: 'I-A3',
           res(g, d) {
             g.present().forEach((p) => { if (g.chance(25)) g.wound(p); });
+            if (d.wand && !d.wand.ok) return `Bombarda! ${d.wand.who.name} pálcájából csak szikra pattan. A mennyezeten egy repedés fut végig, de az alagút nyitva marad.`;
             if (g.sab(d, 'weak')) return 'Bombarda! A mennyezet lezúdul. Por, csend. Legalábbis úgy tűnik.';
             g.f.boszorkany_lezarva = 1; g.f.boszorkany_nyitva = 0; g.defense('az alagút beomlott');
             return 'Bombarda! A mennyezet lezúdul. Por, csend. Ezen az úton ma éjjel senki nem jön.';
@@ -297,6 +386,15 @@
         { id: 'weak', t: 'Gyengén célzol, ha robbantani kell.', seen: 'félrecélzott a robbantásnál' },
         { id: 'dust', t: 'Elmaszatolod a lábnyomokat.', seen: 'elmaszatolta a lábnyomokat a porban' }
       ]
+    },
+    // C: the duellist (or someone with a wand) draws the Bombarda movement on the phone.
+    async challenge(g, d, tok) {
+      if (d.key !== 'C' || !CE.mini) return;
+      const who = wandUser(g);
+      if (!who) return;
+      const res = (await g.minigame([who], 'palca', { spell: 'Bombarda', title: `${who.name}: Bombarda! Rajzold le a pálcamozdulatot!` })).get(who.id);
+      g.check(tok);
+      d.wand = { ok: g.wandOk(res), who };
     }
   });
 
@@ -344,10 +442,23 @@
     id: 'I-B2', act: 1, branch: 2, title: 'A dementor', place: 'A torony teteje', clock: 20, music: 'breath',
     narr: ['Amikor Reparo-t mondanátok az ablakra, egy alak lebeg be rajta. Rongyos köpeny, a csuklya alatt sötétség. Egy rothadó, szürke kéz nyúl felétek.', 'Minden boldog gondolat elszivárog belőletek.', 'HIDEG ÁRAD!'],
     decision: CE.dementorReflex('HIDEG ÁRAD!'),
-    resolve(g) {
+    // After a successful patronus someone still has to mend the window: Reparo, drawn on the phone.
+    async challenge(g, d, tok) {
+      if (!g.cur.patronusOk || g.f.ablak_lezarva || !CE.mini) return;
+      const who = wandUser(g);
+      if (!who) return;
+      const res = (await g.minigame([who], 'palca', { spell: 'Reparo', title: `${who.name}: Reparo! Rajzold le a pálcamozdulatot!` })).get(who.id);
+      g.check(tok);
+      d.wand = { ok: g.wandOk(res), who };
+    },
+    resolve(g, d) {
       if (g.cur.patronusOk) {
+        if (d.wand && !d.wand.ok) {
+          g.f.ablak_nyitva = 1;
+          return `Az ezüst fénytől a dementor hátrahőköl, és kisodródik a viharba. ${d.wand.who.name} Reparo-ja félresikerül: a szilánkok visszaugranak, de az üveg nem forr össze. Az ablak nyitva marad.`;
+        }
         if (!g.f.ablak_lezarva) { g.f.ablak_lezarva = 1; g.f.ablak_nyitva = 0; g.defense('sikeres patrónus a toronyban'); }
-        return 'Az ezüst fénytől a dementor hátrahőköl, és kisodródik a viharba. A csapat megjavítja az ablakot.';
+        return d.wand ? `Az ezüst fénytől a dementor hátrahőköl, és kisodródik a viharba. Reparo! ${d.wand.who.name} pálcája nyomán az üveg összeforr.` : 'Az ezüst fénytől a dementor hátrahőköl, és kisodródik a viharba. A csapat megjavítja az ablakot.';
       }
       g.f.ablak_nyitva = 1;
       return 'Senkinek nem sikerült. A dementor lassan kilebeg az ablakon, de az ablak nyitva marad.';
@@ -394,9 +505,14 @@
       pick: (g) => g.rng.pick(g.present()),
       options: [
         { k: 'A', t: 'Kiveszem, ami bent van.', w: { loyal: 3, traitor: 2 }, res(g, d) {
-          const who = d.chooser || g.rng.pick(g.present());
-          const caught = g.chance((g.f.tusszentes ? 50 : 25) + (g.sab(d, 'cough') ? 15 : 0));
-          if (g.f.terkep === 'frics_fiok') { g.moveMap(who); g.say(`${who.name} zsebre teszi a pergament.`); } else { g.giveItem(who, 'tragyabomba'); g.say(`${who.name} zsebre tesz egy trágyabombát.`); }
+          const who = (d.sneak && d.sneak.who) || d.chooser || g.rng.pick(g.present());
+          const r = d.sneak && d.sneak.res;
+          // With the sneaking mini-game: caught while moving, or a cough behind Filch's back once at the drawer.
+          const caught = r ? (r.caught || (g.sab(d, 'cough') && g.chance(40))) : g.chance((d.sneeze ? 50 : 25) + (g.sab(d, 'cough') ? 15 : 0));
+          const reached = r ? !!r.done : true;
+          if (reached) {
+            if (g.f.terkep === 'frics_fiok') { g.moveMap(who); g.say(`${who.name} zsebre teszi a pergament.`); } else { g.giveItem(who, 'tragyabomba'); g.say(`${who.name} zsebre tesz egy trágyabombát.`); }
+          } else if (!caught) g.say(`${who.name} nem ér oda időben a fiókhoz. Üres kézzel oson vissza.`);
           if (caught) { who.status = 'bezarva'; who.away = 1; g.add('frics_gyanakszik', 1); return `Frics megfordul. „Te! Büntetőmunka!” ${who.name} egy jelenetre Frics fogságába kerül.`; }
           return 'Frics semmit nem vett észre.';
         } },
@@ -404,7 +520,16 @@
       ]
     },
     kozben: { heir: [{ id: 'cough', t: 'Halkan köhintesz.', seen: 'szándékosan köhintett Frics háta mögött' }] },
-    afterDecision(g) { g.f.tusszentes = 0; },
+    afterDecision(g, d) { d.sneeze = g.f.tusszentes; g.f.tusszentes = 0; },
+    // A: the chooser sneaks to the drawer on the phone while Filch keeps turning round (more often after a sneeze).
+    async challenge(g, d, tok) {
+      if (d.key !== 'A' || !CE.mini) return;
+      const who = d.chooser || g.rng.pick(g.present());
+      if (!who) return;
+      const res = (await g.minigame([who], 'lopakodas', { watcher: 'Frics', char: 'frics', alert: !!d.sneeze, title: `${who.name} a fiókhoz oson. Lépj, amíg Frics háttal van!` })).get(who.id);
+      g.check(tok);
+      d.sneak = { who, res: res || CE.mini.worst('lopakodas') };
+    },
     next: 'I-C3'
   });
 
@@ -416,16 +541,45 @@
     enter(g) { if (g.mapHolder() && !g.isEvil(g.mapHolder())) g.f.bellatrix_ismert = 1; },
     decision: (g) => (g.mapHolder() && !g.isEvil(g.mapHolder())) ? {
       type: 'vote', prompt: 'Mit kezdtek a térképpel?', options: [
-        { k: 'A', t: 'Megnézzük, ki hol volt az elmúlt órában.', w: { loyal: 3, traitor: 1 }, res(g) {
+        { k: 'A', t: 'Megnézzük, ki hol volt az elmúlt órában.', w: { loyal: 3, traitor: 1 }, res(g, d) {
           const t = g.players.find((p) => p.traitor);
-          const acted = t && g.s.history.some((id) => (CE.SCENES[id] || {}).act === 1 && (g.s.sceneLog[id] || []).some((a) => a.actor === t.id && a.kind === 'sneak'));
-          return acted ? `A pontok lassan visszafelé kúsznak az időben. A harmadik emeleten egy név: ${t.name}.` : 'A pontok lassan visszafelé kúsznak az időben. A harmadik emeleten senki.';
+          const acted = traitorSneaked(g);
+          // With the memory mini-game the team must remember the map; a wrong majority learns nothing for sure.
+          if (d.mapq && !d.mapq.ok) return 'A pontok túl gyorsan kúsztak vissza az időben. Mire megbeszélnétek, a pergamen elhalványul. Mindenki mást látott.';
+          return acted ? `A pontok lassan visszafelé kúsznak az időben. A harmadik emeleten egy név: ${t.name}.` : 'A pontok lassan visszafelé kúsznak az időben. A harmadik emeleten csak Mrs. Norris. Diák senki.';
         } },
         { k: 'B', t: 'Rohanunk a szoborhoz, és lezárjuk.', w: { loyal: 2, traitor: 1 }, res(g, d) { if (g.helpersHalf(d)) { g.f.boszorkany_lezarva = 1; g.f.boszorkany_nyitva = 0; g.defense('a púpos boszorkány lezárva'); return 'A púp nehezen mozdul, de a varázslat megtartja.'; } return 'Mire odaértek, a szobor már nem mozdul. Nem tudjátok, zárva van-e.'; } },
         { k: 'C', t: 'Odaadjuk a térképet McGonagallnek.', w: { loyal: 1, traitor: 3 }, res(g) { g.add('dumbledore_hu', 1); g.f.terkep = 'mcgonagall'; return 'McGonagall elsápad, amikor meglátja a nevet. „Köszönöm. Most menjenek vacsorázni. Mindannyian.”'; } }
       ]
     } : null,
     resolve(g) { if (!(g.mapHolder() && !g.isEvil(g.mapHolder())) && g.present().length) { g.wound(g.rng.pick(g.present())); } },
+    // A: the TV shows the map for a few seconds; then everyone answers on the phone who was on the third floor.
+    async challenge(g, d, tok) {
+      if (d.key !== 'A' || !CE.mini) return;
+      const team = g.present();
+      if (!team.length) return;
+      const t = g.players.find((p) => p.traitor);
+      const acted = traitorSneaked(g);
+      const alive = g.players.filter((p) => p.status !== 'szellem' && !p.escaped);
+      const office = alive.filter((p) => p.away === 0 && !(acted && p === t)).map((p) => p.name);
+      const away = alive.filter((p) => p.away > 0 && !(acted && p === t)).map((p) => p.name);
+      const places = g.rng.shuffle([
+        { name: 'Harmadik emelet', who: g.rng.shuffle(['Mrs. Norris'].concat(acted ? [t.name] : [])) },
+        { name: 'Frics irodája', who: g.rng.shuffle(office.concat(['Frics'])) },
+        { name: 'Csillagvizsgáló-torony', who: ['Hóborc'] },
+        { name: 'Nagy Terem', who: ['McGonagall', 'Flitwick'] },
+        { name: 'Pince', who: ['Piton'] },
+        { name: 'Hagrid kunyhója', who: ['Hagrid'] },
+        { name: 'Gyengélkedő', who: ['Madam Pomfrey'].concat(away) }
+      ]);
+      const options = alive.map((p) => ({ k: String(p.id), t: p.name })).concat([{ k: 'none', t: 'Senki a diákok közül' }]);
+      const answer = acted ? String(t.id) : 'none';
+      const res = await g.minigame(team, 'terkep', { places, options, answer, question: 'Melyik diák volt a harmadik emeleten?' });
+      g.check(tok);
+      const right = team.filter((p) => (res.get(p.id) || {}).k === answer).length;
+      d.mapq = { ok: right * 2 > team.length, right, of: team.length };
+      g.log('térkép', `${right}/${team.length} emlékezett jól`);
+    },
     kozben: {},
     next: 'I-S'
   });

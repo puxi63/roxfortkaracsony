@@ -117,11 +117,10 @@
     return {
       type: 'reflex', prompt: 'EXPECTO PATRONUM!', time: 5, bonus,
       options: [{
-        k: 'patr', t: 'Expecto Patronum!', w: { loyal: 1, traitor: 1 },
+        k: 'patr', t: 'Expecto Patronum!', mini: 'ritmus', w: { loyal: 1, traitor: 1 },
         hint(g, p) {
           if (!p.wand) return 'Nincs pálcád.';
-          const c = `${g.patronusChance(p, waveExtra(g, p))}%`;
-          return p.memoryText ? `„${p.memoryText}” · ${c}` : c;
+          return p.memoryText ? `„${p.memoryText}” · utána ritmusra koppintasz` : 'utána ritmusra koppintasz';
         },
         res(g, p, c) {
           const w = g.cur.wave = g.cur.wave || { ok: [], fail: [] };
@@ -493,7 +492,7 @@
     let pct = 45;
     if (att) {
       g.io.notice(`Reflektorban: ${att.name}`);
-      const r = await solo(g, att, 'Lefegyverzed Bellatrixot!', [{ k: 'cap', t: 'Capitulatus!', hint: '70%' }], 5 - takeSlow(att));
+      const r = await solo(g, att, 'Lefegyverzed Bellatrixot!', [{ k: 'cap', t: 'Capitulatus!', hint: CE.mini ? 'utána párbaj: várd ki a jelet' : '70%' }], 5 - takeSlow(att));
       g.check(tok);
       ctx = r.ctx;
       att.powerUsed = true;
@@ -513,7 +512,16 @@
       return;
     }
     log.attacker = att.id;
-    if (ctx.felix || g.chance(pct)) {
+    // The disarm is a reaction duel on the attacker's phone; Felix Felicis still wins outright.
+    let won = ctx.felix;
+    if (!won && CE.mini) {
+      const res = (await g.minigame([att], 'parbaj', { foe: 'Bellatrix', npc: 400 })).get(att.id);
+      g.check(tok);
+      won = g.duelWon(att, res, 400);
+      if (res && res.falseStart) g.say(`${att.name} túl korán emelte a pálcáját.`);
+      else if (res && res.reaction != null) g.say(`${att.name} reakcióideje: ${res.reaction} ms.`);
+    } else if (!won) won = g.chance(pct);
+    if (won) {
       log.ok = true;
       g.add('ostrom', -1);
       g.say(`${att.name}: „Capitulatus!” A pálca ívben repül át a lángoló fák fölött. Bellatrix sikolt, mint egy macska.`);

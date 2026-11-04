@@ -46,8 +46,18 @@
     return {
       seq: pr.seq, kind: pr.kind, title: pr.title, label: pr.label, options: pr.options, toggles: pr.toggles || [],
       items: pr.items, targets: pr.targets, maxLen: pr.maxLen, extendable: !!pr.extendable, reflex: !!pr.reflex,
-      type: pr.meta && pr.meta.type, msLeft: pr.deadline ? Math.max(0, pr.deadline.t - performance.now()) : null
+      type: pr.meta && pr.meta.type, msLeft: pr.deadline ? Math.max(0, pr.deadline.t - performance.now()) : null,
+      game: pr.game, cfg: phoneCfg(pr), startedAgo: pr.deadline ? Math.max(0, performance.now() - pr.deadline.start) : 0
     };
+  }
+
+  // A mini-game config without what the phone must not know (the map answer and the places shown on the TV).
+  function phoneCfg(pr) {
+    if (pr.kind !== 'mini' || !pr.cfg) return undefined;
+    const c = Object.assign({}, pr.cfg);
+    delete c.answer;
+    if (pr.game === 'terkep') delete c.places;
+    return c;
   }
 
   function viewOf(g, p) {

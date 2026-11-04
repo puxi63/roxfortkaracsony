@@ -84,6 +84,7 @@
           return { k: R(g).chance(pct) ? 'yes' : 'no' };
         }
         case 'kozben': return kozben(g, p, prompt);
+        case 'mini': return CE.mini ? CE.mini.bot(prompt.game, prompt.cfg, R(g), p, evil(g, p)) : {};
         case 'choice': {
           const toggles = [];
           (prompt.toggles || []).forEach((t) => {
@@ -92,6 +93,12 @@
             if (t.id === 'big' && R(g).chance(35)) toggles.push('big');
           });
           if (meta.type === 'suspicion') return { k: suspicionVote(g, p, prompt), toggles };
+          if (meta.type === 'potion') {
+            const has = prompt.options.some((o) => o.k === meta.answer);
+            if (evil(g, p) && R(g).chance(45)) { const bad = prompt.options.filter((o) => o.k !== meta.answer && o.k !== 'pass'); if (bad.length) return { k: R(g).pick(bad).k }; }
+            if (has && R(g).chance(85)) return { k: meta.answer };
+            return { k: R(g).chance(6) ? R(g).pick(prompt.options).k : 'pass' };
+          }
           if (meta.type === 'whisper') {
             if (!R(g).chance(55) || !prompt.targets.length) return { k: 'none' };
             const sus = suspects(g, p);

@@ -116,6 +116,22 @@
     }
     root.innerHTML = h + '</div>';
     bind();
+    attachMini();
+  }
+
+  // The mini-game node survives re-renders (state messages, holding the card buttons) while its prompt is open.
+  function attachMini() {
+    const pr = st.prompt;
+    if (st.mini && (!pr || st.sent || st.mini.seq !== pr.seq)) { st.mini.ctrl.stop(); st.mini = null; }
+    const host = root.querySelector('.mg-host');
+    const mini = window.CE && window.CE.mini;
+    if (!host || !pr || pr.kind !== 'mini' || !mini) return;
+    if (st.mini) { host.appendChild(st.mini.el); return; }
+    const el = document.createElement('div');
+    host.appendChild(el);
+    const startAt = st.promptAt - (pr.startedAgo || 0);
+    st.mini = { seq: pr.seq, el, ctrl: null };
+    st.mini.ctrl = mini.mount(el, pr, (r) => { if (st.prompt && st.prompt.seq === pr.seq && !st.sent) answer(r); }, startAt);
   }
 
   function joinForm(askRoom) {
@@ -139,6 +155,7 @@
 
   function promptHtml(pr) {
     let h = `<div class="prompt ${pr.reflex ? 'reflex' : ''}"><div class="ptimer"><i id="ptimer"></i></div><h4>${esc(pr.title || '')}</h4>`;
+    if (pr.kind === 'mini') return `${h}<div class="mg-host"></div></div>`;
     if (pr.kind === 'ack') h += `<button class="opt primary" data-k="ok">${esc(pr.label || 'Rendben')}</button>`;
     else if (pr.kind === 'memory') h += '<textarea id="pText" rows="3" maxlength="200" placeholder="Egy boldog emléked…"></textarea><button class="opt primary" data-a="memok">Kész</button><button class="opt" data-a="memno">Nem írok</button>';
     else if (pr.kind === 'text') h += `<input id="pText" type="text" maxlength="${pr.maxLen || 25}" placeholder="Rövid válasz"><button class="opt primary" data-a="textok">Küldés</button>`;

@@ -154,6 +154,23 @@
       await this.wait(this.readMs(screen.paragraphs));
     }
 
+    // The game intro: one slide at a time, read aloud when TTS is on; "Tovább" skips a slide.
+    async intro(slides, alive) {
+      for (let i = 0; i < slides.length; i++) {
+        if (alive && !alive()) return;
+        this.ui.showIntro(slides, i);
+        const s = slides[i];
+        const lines = [`${s.title}.`].concat(s.text, (s.list || []).map((x) => `${x[1]}: ${x[2]}.`));
+        if (this.ui.tts && this.ui.speed <= 2) {
+          let skipped = false;
+          const w = this.wait(this.readMs(lines) * 3).then(() => { skipped = true; tts.stop(); });
+          await Promise.race([tts.speak(lines), w]);
+          if (!skipped && this.ui.skip) this.ui.skip();
+          if (!skipped) await this.wait(1500 / this.ui.speed);
+        } else await this.wait(this.readMs(lines, 6) * 1.5);
+      }
+    }
+
     async result(info) {
       const out = info.out.filter(Boolean);
       const changes = info.changes || [];
@@ -347,7 +364,7 @@
       $('app').hidden = false;
       this.fillJump();
       this.renderAll();
-      this.game.run('P1');
+      this.game.run($('sIntro') && !$('sIntro').checked ? 'P1' : 'P0');
       this.tick();
     },
 
@@ -537,6 +554,16 @@
       $('tvLive').innerHTML = rows;
     },
 
+    showIntro(slides, i) {
+      const s = slides[i];
+      $('tvPlace').textContent = `Játékismertető · ${i + 1} / ${slides.length}`;
+      $('tvTitle').textContent = s.title;
+      const list = s.list ? `<ul class="intro-list">${s.list.map(([icon, name, desc], j) => `<li style="animation-delay:${(j * 0.25) / this.speed}s"><span class="ic">${esc(icon)}</span><b>${esc(name)}</b><span>${esc(desc)}</span></li>`).join('')}</ul>` : '';
+      const dots = `<div class="intro-dots">${slides.map((_, j) => `<i class="${j === i ? 'on' : j < i ? 'done' : ''}"></i>`).join('')}</div>`;
+      $('tvBody').innerHTML = `<div class="intro">${s.text.map((p) => `<p>${esc(p)}</p>`).join('')}${list}${dots}<p class="intro-hint">Tovább: → vagy a Tovább gomb</p></div>`;
+      $('tvLive').innerHTML = '';
+    },
+
     showInfo(title, lines, bad) {
       $('tvTitle').textContent = title;
       $('tvBody').innerHTML = lines.map((l) => `<p class="${bad ? 'err' : ''}">${esc(l)}</p>`).join('');
@@ -592,16 +619,30 @@
     renderLive(col) {
       this.liveCol = col;
       const live = $('tvLive');
-      if (!col) { live.innerHTML = ''; return; }
+      if (!col) { this.stopMiniTv(); live.innerHTML = ''; return; }
       const pr = col.prompts && col.prompts.values().next().value;
       if (!pr) return;
       const meta = pr.meta || {};
+      if (pr.kind !== 'mini' || (this.miniTv && this.miniTv.col !== col)) this.stopMiniTv();
       // A reflex starts with a jolt on the TV.
       if (pr.reflex && col.answers.size === 0 && this.fxFor !== pr.seq) {
         this.fxFor = pr.seq;
         this.playEffect(/HIDEG/i.test(pr.title || '') ? 'dementor-cold' : 'curse');
       }
       const dots = `<div class="answered">${col.players.map((p) => `<span class="${col.answers.has(p.id) ? 'd' : ''}" title="${esc(p.name)}">${esc(p.name[0])}</span>`).join('')}</div>`;
+      // A mini-game draws its own TV picture once; later progress calls only refresh the answered dots.
+      if (pr.kind === 'mini') {
+        if (this.miniTv && this.miniTv.col === col) { const a = live.querySelector('.answered'); if (a) a.outerHTML = dots; return; }
+        const names = col.players.map((p) => p.name).join(', ');
+        live.innerHTML = `<div class="prompt">${esc(pr.title)}</div><p class="mgtv-players">${esc(names)}</p><div class="mgtv-host"></div>${dots}`;
+        $('tv').classList.add('mini-on');
+        this.miniTv = { col, ctrl: CE.mini ? CE.mini.tv(live.querySelector('.mgtv-host'), pr, col.dl.start) : null };
+        return;
+      }
+      if (meta.type === 'potion') {
+        live.innerHTML = `<div class="prompt">${esc(pr.title)}</div><p class="potion-strikes">Elrontott lépés: ${meta.strikes} / 3</p>${dots}`;
+        return;
+      }
       if (pr.kind === 'choice' && (meta.type === 'vote' || meta.type === 'suspicion')) {
         const counts = {};
         col.answers.forEach((a) => { if (a && a.k != null) counts[a.k] = (counts[a.k] || 0) + 1; });
@@ -612,6 +653,36 @@
       }
       const label = pr.kind === 'kozben' || meta.type === 'whisper' ? 'Közben… mindenki titokban választ' : meta.type === 'cross' ? 'Valaki előtt döntés áll…' : pr.kind === 'text' ? 'Mindenki a telefonján válaszol' : pr.kind === 'memory' ? 'Mindenki a boldog emlékére gondol' : pr.title;
       live.innerHTML = `<div class="prompt">${esc(label)}</div>${meta.type === 'cross' ? '' : dots}`;
+    },
+
+    stopMiniTv() {
+      if (!this.miniTv) return;
+      if (this.miniTv.ctrl) this.miniTv.ctrl.stop();
+      this.miniTv = null;
+      $('tv').classList.remove('mini-on');
+    },
+
+    // Keeps a test-mode phone's mini-game node alive across re-renders (the game holds timers and canvas state).
+    attachMini(p, e) {
+      const host = $('phone').querySelector('.mg-host');
+      if (!host || !CE.mini) return;
+      this.minis = this.minis || new Map();
+      let m = this.minis.get(p.id);
+      if (m && m.pr === e.pr) { host.appendChild(m.el); return; }
+      if (m) m.ctrl.stop();
+      const el = document.createElement('div');
+      host.appendChild(el);
+      m = { pr: e.pr, el, ctrl: null };
+      this.minis.set(p.id, m);
+      m.ctrl = CE.mini.mount(el, e.pr, (r) => { if (!e.done) e.resolve(r); }, e.pr.deadline ? e.pr.deadline.start : null);
+    },
+
+    dropStaleMinis() {
+      if (!this.minis) return;
+      this.minis.forEach((m, id) => {
+        const pe = this.io && this.io.pending.get(id);
+        if (!pe || pe.pr !== m.pr) { m.ctrl.stop(); this.minis.delete(id); }
+      });
     },
 
     renderHud() {
@@ -714,14 +785,17 @@
       html += e ? this.promptHtml(p, e.pr) : `<p class="idle">${p.status === 'szellem' ? 'Szellem vagy. Figyeld a többieket.' : 'Nézd a TV-t.'}</p>`;
       html += '</div>';
       const box = $('phone');
+      this.dropStaleMinis();
       box.innerHTML = html;
       this.bindPhone(p, e);
+      if (e && e.pr.kind === 'mini') this.attachMini(p, e);
     },
 
     promptHtml(p, pr) {
       const sub = this.sub[p.id];
       const tg = this.toggleSel[p.id] || new Set();
       let h = `<div class="prompt ${pr.reflex ? 'reflex' : ''}"><div class="ptimer"><i></i></div><h4>${esc(pr.title || '')}</h4>`;
+      if (pr.kind === 'mini') return `${h}<div class="mg-host"></div></div>`;
       if (pr.kind === 'ack') h += `<button class="opt primary" data-k="ok">${esc(pr.label || 'Rendben')}</button>`;
       else if (pr.kind === 'memory') h += `<textarea id="phText" rows="3" maxlength="200" placeholder="Egy boldog emléked…"></textarea><button class="opt primary" data-a="memok">Kész</button><button class="opt" data-a="memno">Nem írok</button>`;
       else if (pr.kind === 'text') h += `<input id="phText" type="text" maxlength="${pr.maxLen || 25}" placeholder="Rövid válasz"><button class="opt primary" data-a="textok">Küldés</button>`;

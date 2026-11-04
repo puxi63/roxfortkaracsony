@@ -303,6 +303,9 @@
       if (dec) Object.assign(d, await this.decide(dec, tok));
       this.check(tok);
       if (sc.afterDecision) sc.afterDecision(this, d);
+      // A scene's mini-game runs after the decision and before the secret step; it stores results in d.
+      if (sc.challenge) await sc.challenge(this, d, tok);
+      this.check(tok);
       if (sc.kozben && this.present().length) await this.kozben(sc.kozben, d, tok);
       this.check(tok);
 
@@ -427,7 +430,8 @@
     async collect(players, mk, sec, opts = {}) {
       const tok = this.token;
       const io = this.io;
-      const dl = { t: io.now() + io.ms(sec), total: sec, start: io.now(), ext: new Set(), stop: false };
+      // Mini-games run in real time on the phones, so their timer ignores the test-mode speed.
+      const dl = { t: io.now() + (opts.realTime ? sec * 1000 : io.ms(sec)), total: sec, start: io.now(), ext: new Set(), stop: false };
       const answers = new Map();
       const prompts = new Map();
       const col = { dl, players, answers, opts, prompts };
@@ -594,6 +598,18 @@
       const ans = await this.collect(parts, mk, time);
       const per = {};
       parts.forEach((p) => { const a = ans.get(p.id); per[p.id] = a; });
+      // Options with a mini-game (e.g. the patronus rhythm) are played by those who chose them.
+      const minis = {};
+      const byGame = {};
+      parts.forEach((p) => {
+        const o = opts.find((x) => x.k === ((per[p.id] || {}).k));
+        const tg = (per[p.id] && per[p.id].toggles) || [];
+        if (o && o.mini && !tg.includes('felix')) (byGame[o.mini] = byGame[o.mini] || []).push(p);
+      });
+      for (const game of Object.keys(byGame)) {
+        const res = await this.minigame(byGame[game], game, { perPlayer: (p) => (game === 'ritmus' ? { window: p.memory ? 175 : 135 } : {}) });
+        res.forEach((r, id) => { minis[id] = r; });
+      }
       // An option with protects:true shields the neighbour, unless the neighbour chose the same.
       const partnerOf = (i) => (parts.length > 1 ? parts[(i + 1) % parts.length] : null);
       const prot = new Set();
@@ -607,12 +623,64 @@
         const o = opts.find((x) => x.k === (a && a.k)) || opts[0];
         const tg = (a && a.toggles) || [];
         const partner = partnerOf(i);
-        const ctx = { felix: tg.includes('felix'), kiteres: tg.includes('kiteres'), partner, partnerChoice: partner ? (per[partner.id] || {}).k : null, prot: prot.has(p.id) };
+        const ctx = { felix: tg.includes('felix'), kiteres: tg.includes('kiteres'), partner, partnerChoice: partner ? (per[partner.id] || {}).k : null, prot: prot.has(p.id), mini: minis[p.id] };
         if (ctx.felix) p.powerUsed = true;
         o.res(this, p, ctx);
       });
       this.log('reflex', parts.map((p) => `${p.name}:${(per[p.id] || {}).k}`).join(' '));
       return { per };
+    }
+
+    // ---------- mini-games ----------
+
+    // Runs a phone mini-game (js/minigames.js) for the given players; returns Map playerId → result.
+    async minigame(players, game, opts = {}) {
+      if (!players.length || !CE.mini) return new Map();
+      const cfg = CE.mini.make(game, this.rng, opts);
+      const title = opts.title || CE.mini.TITLES[game];
+      this.log('minijáték', `${game}: ${players.map((p) => p.name).join(', ')}`);
+      return this.collect(players, (p) => ({ kind: 'mini', game, cfg: opts.perPlayer ? Object.assign({}, cfg, opts.perPlayer(p)) : cfg, title, meta: { type: 'mini', game } }),
+        Math.ceil(cfg.total / 1000) + 3, { realTime: true, dflt: () => CE.mini.worst(game) });
+    }
+
+    // Wand movement success: at least 55% of the checkpoints in order.
+    wandOk(res) { return !!res && res.score >= 0.55; }
+
+    // A duel is won with a clean reaction faster than the opponent's (duellists get 80 ms).
+    duelWon(p, res, npc) { return !!res && !res.falseStart && res.reaction != null && res.reaction < npc + (p.role === 'parbajozo' ? 80 : 0); }
+
+    // The team brews an antidote together: each phone holds different ingredients, the TV gives a clue per step.
+    async brewAntidote(victim, tok) {
+      const team = this.present().filter((p) => p !== victim);
+      if (!CE.mini || team.length < 2 || victim.antidoteTried) return false;
+      victim.antidoteTried = true;
+      const all = this.rng.shuffle(Object.keys(CE.mini.INGREDIENTS));
+      const recipe = this.rng.shuffle(all).slice(0, 4);
+      const hands = new Map();
+      all.forEach((ing, i) => { const p = team[i % team.length]; hands.set(p.id, (hands.get(p.id) || []).concat(ing)); });
+      await this.io.info('Ellenméreg', [`${victim.name} haldoklik, és nincs bezoár. Madam Pomfrey üstje még meleg.`, 'Mindenkinél más hozzávaló van. A TV elárulja, mi kell a következő lépéshez. Csak az tegye be, akinél van!']);
+      this.check(tok);
+      let strikes = 0;
+      let step = 0;
+      for (; step < recipe.length && strikes < 3; step++) {
+        const want = recipe[step];
+        const ans = await this.collect(team, (p) => ({
+          kind: 'choice', title: `${step + 1}. lépés: ${CE.mini.INGREDIENTS[want]}`,
+          options: (hands.get(p.id) || []).map((x) => ({ k: x, t: x })).concat([{ k: 'pass', t: 'Nálam nincs ilyen' }]),
+          meta: { type: 'potion', step, strikes, answer: want }
+        }), 15, { stopWhen: (m) => [...m.values()].some((a) => a && a.k === want), dflt: () => ({ k: 'pass' }) });
+        this.check(tok);
+        const wrong = team.filter((p) => { const a = ans.get(p.id); return a && a.k !== 'pass' && a.k !== want; });
+        const right = team.some((p) => { const a = ans.get(p.id); return a && a.k === want; });
+        strikes += wrong.length + (right ? 0 : 1);
+        if (wrong.length) this.io.notice(`Rossz hozzávaló az üstben! (${wrong.map((p) => p.name).join(', ')})`);
+        if (!right) this.io.notice('Senki nem tette be, ami kellett.');
+        this.log('ellenméreg', `${step + 1}. lépés: ${want} · ${right ? 'jó' : 'rossz'} · hibák: ${strikes}`);
+      }
+      const ok = step >= recipe.length && strikes < 3;
+      if (ok) { this.revive(victim, null); this.io.notice(`Az ellenméreg kész! ${victim.name} köhög, és újra lélegzik.`); }
+      else this.io.notice('Az üst felforr, a főzet elrontva. Ez nem segít.');
+      return ok;
     }
 
     // Everyone chooses on their own (e.g. where to spend the afternoon); the scene resolves d.per itself.
@@ -642,7 +710,14 @@
     }
 
     castPatronus(p, ctx, extra = 0) {
-      const ok = ctx.felix || this.rng.chance(this.patronusChance(p, extra));
+      // With the rhythm mini-game the player's own timing decides most of it; the happy memory still helps.
+      let chance = this.patronusChance(p, extra);
+      if (ctx.mini && typeof ctx.mini.score === 'number') {
+        chance = 12 + ctx.mini.score * 78 + (p.memory ? 10 : 0) + (p.role === 'parbajozo' ? 8 : 0) + p.patronusBonus + extra;
+        if (this.players.some((x) => x.status === 'dermedt' || x.status === 'haldoklik')) chance -= 8;
+        chance = Math.max(5, Math.min(97, chance));
+      }
+      const ok = ctx.felix || this.rng.chance(chance);
       if (ok) { p.stats.patronusOk += 1; p.patronusBonus = 0; this.say(`${p.name} patrónusa, egy ezüst ${p.patronus}, ragyogva tör előre.`); this.io.patronus(p); }
       else { p.stats.patronusFail += 1; }
       return ok;
@@ -855,7 +930,10 @@
         });
         this.check(tok);
         const helper = rescuers.find((p) => { const a = ans.get(p.id); return a && a.k !== 'no'; });
-        if (!helper) continue;
+        if (!helper) {
+          if (n.status === 'haldoklik' && n.dyingCause === 'mereg') await this.brewAntidote(n, tok);
+          continue;
+        }
         const k = ans.get(helper.id).k;
         if (k === 'heal') { helper.healsThisAct += 1; this.revive(n, helper); this.io.notice(`${helper.name} ellátta ${n.name} sebeit.`); }
         else if (k === 'csoki') { this.takeItem(helper, 'csoki'); this.revive(n, helper); this.io.notice(`${helper.name} csokibékát adott ${n.name} kezébe.`); }

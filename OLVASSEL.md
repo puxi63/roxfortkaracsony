@@ -8,6 +8,19 @@ A történet a `../forgatokonyv/` mappában van.
 - **A teljes történet** végigjátszható: prológus, I. Szenteste, II. Karácsony napja, III. Karácsony éjjele,
   finálé, epilógus és a 10 befejezés.
 - **Játék telefonokkal:** a TV-n QR-kód, mindenki a saját telefonjával csatlakozik.
+- **Játékismertető az elején:** 7 rövid dia a TV-n (mire számíthattok, a telefon, a döntések, az áruló, a minijátékok,
+  az életek, ki nyer), utána mindenki a telefonján nyomja meg: **Készen állok**. A beállításoknál kikapcsolható.
+- **Minijátékok a telefonon** (a TV-n is látszik, mi történik):
+  - *Expecto Patronum*: ütemre koppintás, amikor az ezüst kör felvillan (dementoros jeleneteknél, az ezüsthullámnál).
+  - *Pálcamozdulat*: a számozott pontokon végighúzott ujj (Bombarda az alagútban, Reparo a toronyablakon,
+    Immobilus a Fúriafűznél, ott az egész csapat átlaga számít).
+  - *Lopakodás*: csak akkor lehet lépni, ha Frics háttal van (az elkobzott holmik fiókja).
+  - *Párbaj*: ki kell várni a jelet, és gyorsabbnak lenni Bellatrixnál (a lefegyverzés).
+  - *Tekergők Térképe*: a TV pár másodpercig mutatja, ki hol van, aztán telefonon kell megmondani, ki volt a harmadik emeleten.
+  - *Ellenméreg*: ha valaki mérgezéstől haldoklik, és nincs bezoár, a csapat közösen főz; mindenkinél más hozzávaló van,
+    a TV adja a nyomot, és csak az tegye be, akinél van. Három hiba, és a főzet elromlik.
+- **Krónika:** a TV-n és a telefonokon is visszanézhető, mi döntött a csapat, és mi lett a következménye.
+- **Felolvasás:** a beállításoknál választható hang és tempó (Edge-ben a „Noémi” vagy „Tamás” természetes hang a legjobb).
 - **Zene:** a jelenetek hangulatához illő filmzene, áttűnéssel, felolvasás közben elhalkul.
 - **Tesztmód:** egyetlen gépen, gépi játékosokkal. Te egy játékos helyén döntesz, a többit a gép vezeti,
   de bármelyik telefonon kattinthatsz helyettük.
@@ -92,11 +105,13 @@ A képernyő:
 | `js/engine.js` | a játékmotor |
 | `js/story-act1.js`, `story-act2.js`, `story-act3.js` | a jelenetek |
 | `js/data.js` | szerepek, tárgyak, parancsok, kérdések, célok, útkereszteződések, víziók, zenék |
+| `js/minigames.js` | a minijátékok (telefon, TV-kép, gépi játékosok) |
+| `js/art.js`, `css/art.css` | a jelenetképek, alakok, patrónusok és effektek |
 | `js/bots.js`, `js/batch.js` | a gépi játékosok és a statisztika |
 | `js/ui.js` | a TV-kép, a tesztmód telefonjai, a zene és a felolvasás |
 | `assets/music/` | a filmzene (csak helyben!) |
 
 ## Ami még jön
 
-1. Próbajáték élő emberekkel, utána a nehézség finomhangolása.
-2. Grafika (jelenetképek) és hangeffektek.
+1. Próbajáték élő emberekkel, utána a nehézség finomhangolása (a minijátékok nehézsége is).
+2. Hangeffektek.
