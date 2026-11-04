@@ -113,12 +113,14 @@
         let item;
         do { item = g.rng.pick(CE.FIRST_GIFTS); } while (CE.UNIQUE_GIFTS.includes(item) && taken.has(item));
         taken.add(item);
-        g.giveItem(p, item);
-        if ((g.settings.sweaters || []).includes(p.id)) g.giveItem(p, 'pulover');
-        g.secret(p, `Ajándékot kaptál: ${CE.ITEMS[item].name}. ${CE.ITEMS[item].text}`, 'hangulat');
+        // Stays wrapped until the player presses "Kibontom".
+        const items = [item];
+        let text = `Ajándékot kaptál: ${CE.ITEMS[item].name}. ${CE.ITEMS[item].text}`;
+        if ((g.settings.sweaters || []).includes(p.id)) { items.push('pulover'); text += `\n\nÉs egy ${CE.ITEMS.pulover.name}: ${CE.ITEMS.pulover.text}`; }
+        g.setGift(p, items, text);
       });
     },
-    decision: { type: 'ack', prompt: 'Bontsd ki az ajándékodat!', label: 'Kibontom', time: 30 },
+    decision: { type: 'ack', prompt: 'Bontsd ki az ajándékodat!', label: 'Kibontom', time: 30, onAck: (g, p) => g.unwrap(p) },
     next: (g) => g.rng.pick(['P4a', 'P4b', 'P4c'])
   });
 

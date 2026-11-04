@@ -151,12 +151,11 @@
         for (let i = 0; i < 30 && CE.UNIQUE_GIFTS.includes(item) && given.has(item); i++) item = g.rng.pick(CE.FIRST_GIFTS);
         if (CE.UNIQUE_GIFTS.includes(item) && given.has(item)) item = 'csoki';
         if (CE.UNIQUE_GIFTS.includes(item)) given.add(item);
-        g.giveItem(p, item);
-        g.giveItem(p, 'karamella');
-        g.giveItem(p, 'sapka');
+        // Stays wrapped until the player presses "Kibontom" (see before).
+        const items = [item, 'karamella', 'sapka'];
         let text = `Karácsonyi ajándékot kaptál: ${CE.ITEMS[item].name}. ${CE.ITEMS[item].text}\n\nA karácsonyi listáról: Házi karamella. Mrs. Weasley mindenkinek küldött. Puha, édes, otthonszagú. És egy kötött sapka. Kicsit szúr. Kicsit nagy. Melegen tart.`;
-        if ((g.settings.sweaters || []).includes(p.id) && !p.items.includes('pulover')) { g.giveItem(p, 'pulover'); text += '\n\nÉs egy új Weasley-pulóver, mert a régit elhasználtad.'; }
-        g.secret(p, text, 'hangulat');
+        if ((g.settings.sweaters || []).includes(p.id) && !p.items.includes('pulover')) { items.push('pulover'); text += '\n\nÉs egy új Weasley-pulóver, mert a régit elhasználtad.'; }
+        g.setGift(p, items, text);
       });
     },
     narr(g) {
@@ -178,6 +177,10 @@
     },
     // The package vote runs here so the volunteer and the gloves are settled before the result screen.
     async before(g, tok) {
+      // Everyone unwraps their own presents on the phone; prisoners find theirs later.
+      await g.ackAll({ prompt: 'Bontsd ki az ajándékaidat!', label: 'Kibontom', time: 25, onAck: (gg, p) => { if (p.status !== 'bezarva') gg.unwrap(p); } });
+      g.check(tok);
+      g.players.forEach((p) => { if (p.status !== 'bezarva') g.unwrap(p); });
       const h = g.players.find((p) => p.heir && g.present().includes(p));
       if (h) {
         const k = await ask(g, h, 'Megnézed a csomagolópapírokat?', [{ k: 'look', t: 'Megnézem' }, { k: 'no', t: 'Most nem' }], 15, 'no');

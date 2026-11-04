@@ -14,7 +14,8 @@
 
   const st = {
     room: (qs.get('szoba') || '').toUpperCase(), local: qs.get('helyi') === '1',
-    name: store.get('csendesej.name') || '', token: null, joined: false, started: false, seat: null,
+    // The name is typed in every time on purpose; only the seat token is remembered for reconnecting.
+    name: '', token: null, joined: false, started: false, seat: null,
     view: null, prompt: null, promptAt: 0, sent: false, sub: null, toggles: new Set(), hold: null, seenInbox: 0,
     status: '', send: () => {}, typing: false, dirty: false
   };
@@ -92,11 +93,15 @@
     const hearts = ghost ? 'szellem' : '♥'.repeat(Math.max(0, v.hp)) + '♡'.repeat(Math.max(0, 3 - v.hp));
     const unread = Math.max(0, v.inbox.length - st.seenInbox);
     let h = `<div class="ph ${ghost ? 'ghost' : ''}">
-      <div class="ph-top"><span class="ph-name">${esc(v.sym)} ${esc(v.name)}</span><span>${hearts}${STATUS[v.status] ? ' · ' + STATUS[v.status] : ''}</span></div>
+      <div class="ph-top"><span class="ph-name">${esc(v.name)}</span><span>${hearts}${STATUS[v.status] ? ' · ' + STATUS[v.status] : ''}</span></div>
       <div class="ph-top"><span>${esc(v.scene)}</span><span>${esc(v.clock)}</span></div>
-      <div class="items">${v.items.map((i) => `<span>${esc(i)}</span>`).join('')}${v.map ? '<span>Tekergők Térképe</span>' : ''}</div>
       <div class="ph-row"><button class="hold-btn" data-hold="pages" type="button">Tartsd nyomva: lapjaim</button><button class="hold-btn" data-hold="inbox" type="button">Tartsd nyomva: titkos lapok${unread ? `<span class="badge">${unread}</span>` : ''}</button></div>`;
-    if (st.hold === 'pages') h += v.pages.map((pg) => `<div class="page ${pg.style || ''}"><small>${esc(pg.title)}</small>${esc(pg.text)}</div>`).join('');
+    // Role, items and the map are secret too: they only show while the button is held.
+    if (st.hold === 'pages') {
+      const things = v.items.concat(v.map ? ['Tekergők Térképe'] : []);
+      h += `<div class="page"><small>Tárgyaid</small>${things.length ? things.map(esc).join(', ') : 'Nincs tárgyad.'}</div>`;
+      h += v.pages.map((pg) => `<div class="page ${pg.style || ''}"><small>${esc(pg.title)}</small>${esc(pg.text)}</div>`).join('');
+    }
     else if (st.hold === 'inbox') h += v.inbox.length ? v.inbox.slice(-6).reverse().map((pg) => `<div class="page ${pg.style || ''}"><small>titkos lap</small>${esc(pg.text)}</div>`).join('') : '<p class="idle">Még nincs titkos lapod.</p>';
     else if (st.prompt && !st.sent) h += promptHtml(st.prompt);
     else if (st.prompt && st.sent) h += '<p class="idle">Elküldve. Nézd a TV-t.</p>';
@@ -116,7 +121,7 @@
   function joinForm(askRoom) {
     return `<div class="ph"><p class="eyebrow">Csendes éj Roxfortban</p><h4 class="ph-name">Feliratkozás</h4>
       ${askRoom ? '<label>Szoba kódja <input id="jRoom" type="text" maxlength="4" autocapitalize="characters"></label>' : `<p class="muted">Szoba: <b>${esc(st.room)}</b></p>`}
-      <label>A neved <input id="jName" type="text" maxlength="14" value="${esc(st.name)}" autocomplete="nickname"></label>
+      <label>A neved <input id="jName" type="text" maxlength="14" autocomplete="off" autocorrect="off" spellcheck="false"></label>
       <button id="jGo" class="opt primary" type="button">Belépek</button>
       ${st.status ? `<p class="idle">${esc(st.status)}</p>` : ''}</div>`;
   }
@@ -127,7 +132,6 @@
       if (r) st.room = r.value.trim().toUpperCase();
       st.name = document.getElementById('jName').value.trim().slice(0, 14);
       if (!st.room || !st.name) { st.status = 'Add meg a szoba kódját és a neved.'; render(); return; }
-      store.set('csendesej.name', st.name);
       wake();
       connect();
     };
@@ -217,6 +221,5 @@
   }
   requestAnimationFrame(tick);
 
-  if (st.room && st.name) { connect(); }
   render();
 })();

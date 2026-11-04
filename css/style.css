@@ -41,6 +41,10 @@ fieldset label { font-size: 13px; }
 .ok { color: var(--green); }
 
 .card.wide { grid-column: 1 / -1; }
+.voice-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.voice-row label { gap: 8px; }
+.voice-row select { max-width: 420px; }
+#sVoiceHint { margin: 0; }
 .row-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---------- phone lobby ---------- */

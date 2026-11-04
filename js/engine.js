@@ -284,6 +284,8 @@
       if (sc.clockSet != null) s.clock = sc.clockSet;
       this.cur = { id, sc, out: [], ev: { frozen: [], wounded: [], dying: [] }, d: null, halfWatch: false, noSneak: false };
       if (s.noSneakNext) { this.cur.noSneak = true; s.noSneakNext = false; }
+      // A prisoner finds the presents waiting on the bed once they are back.
+      this.players.forEach((p) => { if (p.pendingGift && p.status === 'el' && p.away === 0 && id !== 'P3' && id !== 'II-0') this.unwrap(p); });
       this.cur.pub0 = this.publicSnap();
       s.sceneLog[id] = s.sceneLog[id] || [];
       if (sc.enter) sc.enter(this);
@@ -438,6 +440,7 @@
         io.prompt(p, pr).then((a) => {
           if (tok !== this.token || answers.has(p.id) || this.curCollect !== col) return;
           answers.set(p.id, a);
+          if (opts.onAnswer) opts.onAnswer(p, a);
           io.progress(col);
           if (opts.stopWhen && opts.stopWhen(answers)) dl.stop = true;
         });
@@ -502,10 +505,25 @@
       }
     }
 
+    // dec.onAck(g, p) runs the moment a player presses the button (e.g. unwrapping their own gift).
     async ackAll(dec) {
       const who = this.players.filter((p) => p.status !== 'szellem');
-      await this.collect(who, () => ({ kind: 'ack', title: dec.prompt || 'Tovább', label: dec.label || 'Elolvastam' }), dec.time || 40);
+      await this.collect(who, () => ({ kind: 'ack', title: dec.prompt || 'Tovább', label: dec.label || 'Elolvastam' }), dec.time || 40, {
+        onAnswer: dec.onAck ? (p) => dec.onAck(this, p) : null
+      });
+      if (dec.onAck) who.forEach((p) => dec.onAck(this, p));
       return {};
+    }
+
+    // A gift stays wrapped (not in the player's items, no secret page) until unwrap() is called.
+    setGift(p, items, text) { p.pendingGift = { items, text }; }
+
+    unwrap(p) {
+      const pg = p.pendingGift;
+      if (!pg) return;
+      p.pendingGift = null;
+      pg.items.forEach((i) => this.giveItem(p, i));
+      this.secret(p, pg.text, 'hangulat');
     }
 
     async memory(dec) {
