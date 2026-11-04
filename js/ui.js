@@ -11,30 +11,63 @@
 
   // ---------- text-to-speech ----------
 
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
+  };
+
+  // Turns story text into something a speech engine reads well: no quote marks or symbols,
+  // dashes as short pauses, and SHOUTED WORDS in normal case (some voices spell capitals letter by letter).
+  function speakable(text) {
+    return String(text)
+      .replace(/[„”“"«»]/g, '')
+      .replace(/\s*[—–]\s*/g, ', ')
+      .replace(/…/g, '.')
+      .replace(/[♥♡✦✔✘✝•▸◂]/g, '')
+      .replace(/([.!?]),/g, '$1')
+      // Shouted words in lower case; a lone capital between lowered words is part of the shout.
+      .replace(/\p{L}+/gu, (w) => (w.length >= 2 && w === w.toUpperCase() && w !== w.toLowerCase() ? w.toLowerCase() : w))
+      .replace(/(?<=\p{Ll}\s)(\p{Lu})(?=\s\p{Ll})/gu, (c) => c.toLowerCase())
+      // Capitals back at the start of each sentence.
+      .replace(/(^|[.!?]\s+)(\p{Ll})/gu, (m, a, c) => a + c.toUpperCase())
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  // Splits a paragraph into sentences: shorter utterances sound better and avoid Chrome's cut-off on long ones.
+  const sentences = (p) => speakable(p).split(/(?<=[.!?])\s+/).filter((s) => s.length > 1);
+
   const tts = {
     voice: null,
+    chosen: store.get('csendesej.voice'),
+    rate: +(store.get('csendesej.rate') || 0.9),
+    voices() { return window.speechSynthesis ? speechSynthesis.getVoices().filter((v) => /^hu/i.test(v.lang)) : []; },
+    // Natural (neural) voices, such as Edge's Noémi and Tamás, are far easier to understand.
+    isNatural(v) { return /natural|online|neural/i.test(v.name); },
+    rank(v) { return (this.isNatural(v) ? 2 : 0) + (/no[eé]mi|tam[aá]s/i.test(v.name) ? 1 : 0); },
     pick() {
-      if (!window.speechSynthesis) return null;
-      const hu = speechSynthesis.getVoices().filter((v) => /^hu/i.test(v.lang));
-      hu.sort((a, b) => (/natural|online/i.test(b.name) ? 1 : 0) - (/natural|online/i.test(a.name) ? 1 : 0));
-      this.voice = hu[0] || null;
+      const hu = this.voices().sort((a, b) => this.rank(b) - this.rank(a));
+      this.voice = hu.find((v) => v.name === this.chosen) || hu[0] || null;
       return this.voice;
     },
+    choose(name) { this.chosen = name; store.set('csendesej.voice', name); this.pick(); },
+    setRate(r) { this.rate = r; store.set('csendesej.rate', String(r)); },
     speak(paragraphs) {
       return new Promise((resolve) => {
         try {
           if (!window.speechSynthesis) return resolve();
           speechSynthesis.cancel();
           if (!this.voice) this.pick();
-          const parts = paragraphs.slice();
-          music.duck = 0.35;
+          const parts = [].concat(...paragraphs.map(sentences));
+          music.duck = 0.3;
           music.apply();
           const finish = () => { music.duck = 1; music.apply(); resolve(); };
           const next = () => {
             if (!parts.length) return finish();
             const u = new SpeechSynthesisUtterance(parts.shift());
             u.lang = 'hu-HU';
-            u.rate = 0.95;
+            u.rate = this.rate;
+            u.pitch = 1;
             if (this.voice) u.voice = this.voice;
             u.onend = next;
             u.onerror = () => finish();
@@ -46,7 +79,7 @@
     },
     stop() { try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) { /* ignore */ } if (music.duck !== 1) { music.duck = 1; music.apply(); } }
   };
-  if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => tts.pick();
+  if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => { tts.pick(); if (CE.ui) CE.ui.fillVoices(); };
 
   // ---------- background music: two audio elements cross-fading between scene moods ----------
 
@@ -209,6 +242,12 @@
         l.innerHTML = `<input type="checkbox" data-sys="${code}" checked> ${code} ${esc(name)}`;
         fs.appendChild(l);
       });
+      this.fillVoices();
+      $('sRate').value = String(tts.rate);
+      $('sRateVal').textContent = `${Math.round(tts.rate * 100)}%`;
+      $('sVoice').onchange = (e) => tts.choose(e.target.value);
+      $('sRate').oninput = (e) => { tts.setRate(+e.target.value); $('sRateVal').textContent = `${Math.round(tts.rate * 100)}%`; };
+      $('sVoiceTest').onclick = () => { tts.stop(); tts.speak(['Szenteste délután. A hó megállás nélkül esik. HIDEG ÁRAD! A Nagy Teremben ezüstös fény gyúl.']); };
       $('startBtn').onclick = () => this.start();
       $('batchBtn').onclick = () => this.runBatch();
       $('cNext').onclick = () => { if (this.skip) this.skip(); tts.stop(); };
@@ -235,6 +274,22 @@
       document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowRight' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { if (this.skip) this.skip(); }
       });
+    },
+
+    // Voice picker on the start screen: the Hungarian voices of this browser, best first.
+    fillVoices() {
+      const sel = $('sVoice');
+      if (!sel) return;
+      const hu = tts.voices().sort((a, b) => tts.rank(b) - tts.rank(a));
+      const cur = tts.pick();
+      sel.innerHTML = '';
+      if (!hu.length) sel.add(new Option('Nincs magyar hang ezen a gépen', ''));
+      hu.forEach((v) => sel.add(new Option(`${v.name}${tts.isNatural(v) ? ' (természetes)' : ''}`, v.name, false, cur && v.name === cur.name)));
+      const natural = hu.some((v) => tts.isNatural(v));
+      $('sVoiceHint').innerHTML = natural
+        ? '✔ Van természetes magyar hang. Ezt érdemes választani.'
+        : '✘ Ez a böngésző csak gépies magyar hangot ad, ami nehezen érthető. A jól érthető természetes hangokhoz (Noémi, Tamás) nyisd meg a játékot a <b>Microsoft Edge</b> böngészőben, internettel.';
+      $('sVoiceHint').className = natural ? 'ok' : 'bad';
     },
 
     fillSeats() {

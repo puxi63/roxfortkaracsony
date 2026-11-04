@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Spectral:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=Caveat:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/art.css?v=6">
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/art.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <!-- Start screen: test mode settings and batch runs -->
@@ -32,6 +32,16 @@
         <label>Rút pulóveres vendégek <select id="sSweater"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
         <fieldset id="sSystems"><legend>Kiegészítő rendszerek</legend></fieldset>
         <button id="startBtn" class="primary" type="button">Teszt indítása</button>
+      </div>
+
+      <div class="card wide">
+        <h2>Felolvasás</h2>
+        <p id="sVoiceHint" class="muted"></p>
+        <div class="voice-row">
+          <label>Hang <select id="sVoice"></select></label>
+          <label>Sebesség <input id="sRate" type="range" min="0.75" max="1.1" step="0.05"> <span id="sRateVal"></span></label>
+          <button id="sVoiceTest" type="button">▶ Próba</button>
+        </div>
       </div>
 
       <div class="card wide">
@@ -142,16 +152,16 @@
 
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="js/rng.js?v=6"></script>
-  <script src="js/data.js?v=6"></script>
-  <script src="js/engine.js?v=6"></script>
-  <script src="js/story-act1.js?v=6"></script>
-  <script src="js/story-act2.js?v=6"></script>
-  <script src="js/story-act3.js?v=6"></script>
-  <script src="js/bots.js?v=6"></script>
-  <script src="js/batch.js?v=6"></script>
-  <script src="js/art.js?v=6"></script>
-  <script src="js/ui.js?v=6"></script>
-  <script src="js/net.js?v=6"></script>
+  <script src="js/rng.js?v=7"></script>
+  <script src="js/data.js?v=7"></script>
+  <script src="js/engine.js?v=7"></script>
+  <script src="js/story-act1.js?v=7"></script>
+  <script src="js/story-act2.js?v=7"></script>
+  <script src="js/story-act3.js?v=7"></script>
+  <script src="js/bots.js?v=7"></script>
+  <script src="js/batch.js?v=7"></script>
+  <script src="js/art.js?v=7"></script>
+  <script src="js/ui.js?v=7"></script>
+  <script src="js/net.js?v=7"></script>
 </body>
 </html>
