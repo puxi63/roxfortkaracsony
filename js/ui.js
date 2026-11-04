@@ -123,15 +123,19 @@
 
     async result(info) {
       const out = info.out.filter(Boolean);
-      if (!out.length) { await this.wait(500 / this.ui.speed); return; }
-      this.ui.showResult(out);
+      const changes = info.changes || [];
+      if (!out.length && !changes.length) { await this.wait(500 / this.ui.speed); return; }
+      this.ui.showResult(out, changes);
+      if (!out.length) { await this.wait((2500 + changes.length * 700) / this.ui.speed); return; }
       if (this.ui.tts && this.ui.speed <= 2) {
         await Promise.race([tts.speak(out), this.wait(this.readMs(out) * 3)]);
         if (this.ui.skip) this.ui.skip();
         return;
       }
-      await this.wait(this.readMs(out, 2));
+      await this.wait(this.readMs(out, 2) + (changes.length * 500) / this.ui.speed);
     }
+
+    chronicle() { if (this.ui.chronOn) this.ui.showChronicle(); }
 
     prompt(p, pr) {
       return new Promise((resolve) => {
@@ -171,7 +175,7 @@
     secret(p) { this.ui.unread[p.id] = (this.ui.unread[p.id] || 0) + 1; this.ui.renderTabs(); if (this.ui.tab === p.id) this.ui.renderPhone(); }
     vibrate(players) { if (this.ui.game && this.ui.game.sys('R11')) this.ui.buzz(players.map((p) => p.id)); }
     notice(text) { this.ui.toast(text); }
-    patronus(p) { this.ui.toast(`Ezüst ${p.patronus}: ${p.name} patrónusa`, 'silver'); }
+    patronus(p) { if (!(CE.art && CE.art.patronus)) this.ui.toast(`Ezüst ${p.patronus}: ${p.name} patrónusa`, 'silver'); this.ui.showPatronus(p); }
     update() { this.ui.renderAll(); }
     log(entry) { this.ui.appendLog(entry); }
 
@@ -218,6 +222,7 @@
       $('cSnap').onclick = () => this.saveSnap();
       $('cLoad').onclick = () => this.loadSnap($('cSnaps').value);
       $('cNew').onclick = () => this.backToSetup();
+      $('cChron').onclick = () => { this.chronOn = !this.chronOn; if (this.chronOn) this.showChronicle(); else $('chron').hidden = true; };
       $('cFull').onclick = () => { const el = document.documentElement; if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen().catch(() => {}); };
       $('netBtn').onclick = () => CE.net.open(false);
       $('netLocalBtn').onclick = () => CE.net.open(true);
@@ -296,6 +301,7 @@
       if (this.io) this.io.clearAll();
       tts.stop();
       music.stop();
+      this.clearArt();
       if (this.net && CE.net) CE.net.close();
       this.net = false;
       this.game = null;
@@ -361,10 +367,41 @@
     },
 
     // --- TV ---
+    // Art behind the text (js/art.js): a scene's background, figures and lasting effects.
+    // Only redrawn when the picture changes, so animations do not restart on every screen.
+    renderArt(id) {
+      if (!(CE.art && CE.art.forScene)) return;
+      const known = (CE.SCENE_ART && CE.SCENE_ART[id]) || (CE.EVENT_ART && CE.EVENT_ART[id]);
+      if (!known) return;
+      this.showArt(CE.art.forScene(id));
+    },
+
+    showArt(a) {
+      if (!a) return;
+      const bg = a.bg || this.artBg || 'nagyterem';
+      const key = JSON.stringify([bg, a.chars || [], a.fx || [], a.patronus || null]);
+      if (key === this.artKey) return;
+      this.artKey = key;
+      this.artBg = bg;
+      const fx = a.fx || [];
+      const under = fx.filter((n) => (CE.art.FX_UNDER || []).includes(n)).map((n) => CE.art.effect(n)).join('');
+      const over = fx.filter((n) => !(CE.art.FX_UNDER || []).includes(n)).map((n) => CE.art.effect(n)).join('');
+      $('artScene').innerHTML = CE.art.background(bg) + under + CE.art.characters(a.chars || []) + over + (a.patronus ? CE.art.patronus(a.patronus, { small: true }) : '');
+      $('tv').classList.add('has-art');
+    },
+
+    clearArt() {
+      ['artScene', 'artTop'].forEach((id) => { const el = $(id); if (el) el.innerHTML = ''; });
+      this.artBg = this.artKey = null;
+      $('tv').classList.remove('has-art');
+    },
+
     showScene(screen) {
       const sc = screen.scene || {};
       if (screen.music) music.play(screen.music);
-      $('tv').className = MOOD[screen.music] || '';
+      this.renderArt(screen.id);
+      $('tv').classList.remove('cold', 'warm');
+      if (MOOD[screen.music]) $('tv').classList.add(MOOD[screen.music]);
       $('tvPlace').textContent = sc.place || '';
       $('tvTitle').textContent = sc.title || '';
       $('tvBody').innerHTML = screen.paragraphs.map((p) => `<p${/^[A-ZÁÉÍÓÖŐÚÜŰ !]+!$/.test(p) ? ' class="shout"' : ''}>${esc(p)}</p>`).join('');
@@ -372,11 +409,59 @@
       this.renderHud();
     },
 
-    showResult(out) {
-      $('tvBody').innerHTML = `<div class="result">${out.map((p) => `<p>${esc(p)}</p>`).join('')}</div>`;
+    showResult(out, changes = []) {
+      const icon = { good: '✔', bad: '✘', death: '✝', neutral: '•' };
+      const list = changes.length
+        ? `<div class="changes"><p class="changes-h">Mi változott</p>${changes.map((c, i) => `<div class="chg ${c.tone}" style="animation-delay:${(i * 0.45) / this.speed}s"><span>${icon[c.tone] || '•'}</span>${esc(c.text)}</div>`).join('')}</div>`
+        : '';
+      $('tvBody').innerHTML = `<div class="result-wrap">${out.length ? `<div class="result">${out.map((p) => `<p>${esc(p)}</p>`).join('')}</div>` : ''}${list}</div>`;
       $('tvLive').innerHTML = '';
       this.renderHud();
       this.renderChips();
+      changes.filter((c) => c.tone === 'death').forEach((c) => this.deathMoment(c.who));
+    },
+
+    // A death is a big moment on the TV: a toast now, and the art layer's effect if it is loaded.
+    deathMoment(name) {
+      this.toast(`${name} meghalt. A gyertyája kialszik.`, 'silver');
+      if (CE.art && CE.art.effect) this.playEffect('death');
+    },
+
+    playEffect(name) {
+      if (!(CE.art && CE.art.play)) return;
+      const node = CE.art.play($('artTop'), name);
+      // Looping effects (e.g. the dementor cold) are shown only for a moment here.
+      if (node && !(CE.art.FX_DURATION || {})[name]) setTimeout(() => node.remove(), 3500);
+    },
+
+    // A silver animal runs across the TV for a successful patronus.
+    showPatronus(p) {
+      if (!(CE.art && CE.art.patronus)) return;
+      const top = $('artTop');
+      const tpl = document.createElement('template');
+      tpl.innerHTML = CE.art.patronus(p.patronus).trim();
+      const node = tpl.content.firstElementChild;
+      if (!node || !top) return;
+      top.querySelectorAll('.art-patronus').forEach((x) => x.remove());
+      // The owner's name under the silver animal.
+      const tag = document.createElement('div');
+      tag.className = 'pat-name';
+      tag.textContent = `${p.name} · ${p.patronus}`;
+      node.appendChild(tag);
+      top.appendChild(node);
+      setTimeout(() => node.classList.add('art-out'), 2200);
+      setTimeout(() => node.remove(), 3700);
+    },
+
+    showChronicle() {
+      const g = this.game;
+      if (!g) return;
+      const box = $('chron');
+      const items = (g.s.chronicle || []).slice().reverse();
+      const icon = { good: '✔', bad: '✘', death: '✝', neutral: '•' };
+      box.innerHTML = `<div class="chron-head"><b>Krónika</b><button type="button" id="chronClose">Bezár</button></div>` + (items.length ? items.map((e) => `<div class="chron-item"><div class="chron-t">${esc(e.time)} · ${esc(e.title)}</div>${e.choice ? `<div class="chron-c">Döntés: ${esc(e.choice)}</div>` : ''}${e.changes.map((c) => `<div class="chg ${c.tone}"><span>${icon[c.tone] || '•'}</span>${esc(c.text)}</div>`).join('')}</div>`).join('') : '<p class="muted">Még nem történt semmi.</p>');
+      box.hidden = false;
+      $('chronClose').onclick = () => { this.chronOn = false; box.hidden = true; };
     },
 
     showDebate(label, ms) {
@@ -429,7 +514,9 @@
     showEnding(e, isNew) {
       const d = this.loadDiscovery();
       const who = { csapat: 'a csapat', 'aruló': 'az áruló', 'aruló2': 'a második áruló', nagyur: 'a Nagyúr híve' };
-      $('tv').className = (e.winners || []).includes('csapat') ? 'warm' : 'cold';
+      $('tv').classList.remove('cold', 'warm');
+      $('tv').classList.add((e.winners || []).includes('csapat') ? 'warm' : 'cold');
+      if (CE.art && CE.art.forEnding) this.showArt(CE.art.forEnding(e.id));
       $('tvPlace').textContent = isNew ? `Új befejezés felfedezve! ${d.endings.length}/10` : `Befejezések: ${d.endings.length}/10`;
       $('tvTitle').textContent = e.name || 'Vége';
       $('tvBody').innerHTML = (e.text || []).map((p) => `<p>${esc(p)}</p>`).join('') + `<p class="shout">Nyert: ${esc((e.winners || []).map((w) => who[w] || w).join(', ') || 'senki')}</p>`;
@@ -454,6 +541,11 @@
       const pr = col.prompts && col.prompts.values().next().value;
       if (!pr) return;
       const meta = pr.meta || {};
+      // A reflex starts with a jolt on the TV.
+      if (pr.reflex && col.answers.size === 0 && this.fxFor !== pr.seq) {
+        this.fxFor = pr.seq;
+        this.playEffect(/HIDEG/i.test(pr.title || '') ? 'dementor-cold' : 'curse');
+      }
       const dots = `<div class="answered">${col.players.map((p) => `<span class="${col.answers.has(p.id) ? 'd' : ''}" title="${esc(p.name)}">${esc(p.name[0])}</span>`).join('')}</div>`;
       if (pr.kind === 'choice' && (meta.type === 'vote' || meta.type === 'suspicion')) {
         const counts = {};
@@ -482,7 +574,8 @@
     renderChips() {
       const g = this.game;
       if (!g) return;
-      $('tvChips').innerHTML = g.players.map((p) => `<span class="chip ${p.status} ${p.away ? 'away' : ''}">${esc(p.name)}${STATUS[p.status] ? ' · ' + STATUS[p.status] : ''}${p.away && p.status === 'el' ? ' · távol' : ''}</span>`).join('');
+      const tok = (p) => (CE.art && CE.art.player ? `<span class="tok">${CE.art.player(p.name, { status: p.status, index: p.id })}</span>` : '');
+      $('tvChips').innerHTML = g.players.map((p) => `<span class="chip ${p.status} ${p.away ? 'away' : ''}">${tok(p)}${esc(p.name)}${STATUS[p.status] ? ' · ' + STATUS[p.status] : ''}${p.away && p.status === 'el' ? ' · távol' : ''}</span>`).join('');
     },
 
     toast(text, cls = '') {

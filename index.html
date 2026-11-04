@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Spectral:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=Caveat:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=4">
+  <link rel="stylesheet" href="css/art.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
   <!-- Start screen: test mode settings and batch runs -->
@@ -84,6 +85,7 @@
     <section id="stage">
       <div id="tvWrap">
         <div id="tv">
+          <div class="art-layer" id="artScene"></div>
           <div class="frost" id="frost"></div>
           <div class="hud">
             <span id="hClock">16:00</span>
@@ -98,6 +100,8 @@
             <div class="tv-live" id="tvLive"></div>
           </div>
           <div class="tv-chips" id="tvChips"></div>
+          <div class="art-top" id="artTop"></div>
+          <div class="chron" id="chron" hidden></div>
           <div class="toasts" id="toasts"></div>
           <div class="timer"><i id="timerBar"></i></div>
         </div>
@@ -108,6 +112,7 @@
         <label class="check"><input id="cTts" type="checkbox"> Felolvasás</label>
         <label class="check"><input id="cMusic" type="checkbox" checked> Zene</label>
         <input id="cVol" type="range" min="0" max="100" value="50" title="Zene hangereje" aria-label="Zene hangereje">
+        <button id="cChron" type="button">Krónika</button>
         <button id="cNarr" type="button">Mesélő nézet</button>
         <span class="sep"></span>
         <label>Ugrás <select id="cJump"></select></label>
@@ -137,15 +142,16 @@
 
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="js/rng.js?v=4"></script>
-  <script src="js/data.js?v=4"></script>
-  <script src="js/engine.js?v=4"></script>
-  <script src="js/story-act1.js?v=4"></script>
-  <script src="js/story-act2.js?v=4"></script>
-  <script src="js/story-act3.js?v=4"></script>
-  <script src="js/bots.js?v=4"></script>
-  <script src="js/batch.js?v=4"></script>
-  <script src="js/ui.js?v=4"></script>
-  <script src="js/net.js?v=4"></script>
+  <script src="js/rng.js?v=6"></script>
+  <script src="js/data.js?v=6"></script>
+  <script src="js/engine.js?v=6"></script>
+  <script src="js/story-act1.js?v=6"></script>
+  <script src="js/story-act2.js?v=6"></script>
+  <script src="js/story-act3.js?v=6"></script>
+  <script src="js/bots.js?v=6"></script>
+  <script src="js/batch.js?v=6"></script>
+  <script src="js/art.js?v=6"></script>
+  <script src="js/ui.js?v=6"></script>
+  <script src="js/net.js?v=6"></script>
 </body>
 </html>

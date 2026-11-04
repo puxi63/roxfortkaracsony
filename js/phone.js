@@ -102,6 +102,13 @@
     else if (st.prompt && st.sent) h += '<p class="idle">Elküldve. Nézd a TV-t.</p>';
     else h += `<p class="idle">${ghost ? 'Szellem vagy. Figyeld a többieket.' : v.away ? 'Most nem vagy a jelenetben.' : 'Nézd a TV-t.'}</p>`;
     if (st.status) h += `<p class="idle">${esc(st.status)}</p>`;
+    // The chronicle is public: what the team decided and what it caused.
+    const chron = v.chronicle || [];
+    h += `<button class="opt" data-a="chron" type="button">${st.showChron ? 'Krónika elrejtése' : `Krónika: mi történt eddig (${chron.length})`}</button>`;
+    if (st.showChron) {
+      const icon = { good: '✔', bad: '✘', death: '✝', neutral: '•' };
+      h += `<div class="phone-chron">${chron.slice().reverse().map((e) => `<div class="chron-item"><div class="chron-t">${esc(e.time)} · ${esc(e.title)}</div>${e.choice ? `<div class="chron-c">Döntés: ${esc(e.choice)}</div>` : ''}${e.changes.map((c) => `<div class="chg ${c.tone}"><span>${icon[c.tone] || '•'}</span>${esc(c.text)}</div>`).join('')}</div>`).join('') || '<p class="idle">Még nem történt semmi.</p>'}</div>`;
+    }
     root.innerHTML = h + '</div>';
     bind();
   }
@@ -164,6 +171,8 @@
       });
       b.addEventListener('contextmenu', (e) => e.preventDefault());
     });
+    const chronBtn = root.querySelector('[data-a="chron"]');
+    if (chronBtn) chronBtn.onclick = () => { st.showChron = !st.showChron; render(); };
     root.querySelectorAll('input[type=text], textarea').forEach((el) => {
       el.onfocus = () => { st.typing = true; };
       el.onblur = () => { st.typing = false; if (st.dirty) { st.dirty = false; setTimeout(render, 0); } };

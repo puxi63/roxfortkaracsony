@@ -117,6 +117,47 @@ fieldset label { font-size: 13px; }
 .reveal ul { margin: 0; padding-left: 2.2cqw; }
 .err { color: var(--red); font-family: var(--f-ui); }
 
+/* Layer order on the TV: the art scene (its own stacking context), frost, text and HUD, then one-shot
+   effects such as a patronus or a death, then the chronicle and toasts. */
+#tv .art-layer { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+#tv .frost { z-index: 1; }
+/* Patronuses and deaths play right behind the text, so they never hide what the narrator says. */
+#tv .art-top { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+#tv .tv-in { z-index: 3; }
+#tv .hud, #tv .tv-chips, #tv .timer { z-index: 4; }
+#tv .toasts, #tv .chron { z-index: 5; }
+#tv .toasts { top: auto; bottom: 6.5cqw; width: 34cqw; }
+#tv.has-art .tv-body, #tv.has-art .tv-title, #tv.has-art .tv-place { text-shadow: 0 0.15cqw 0.7cqw rgba(0,0,0,.9); }
+.art-patronus .pat-name { position: relative; text-align: center; font-family: var(--f-display); font-size: 2.2cqw; color: var(--silver); text-shadow: 0 0 1.2cqw rgba(221,232,240,.8); margin-top: -1cqw; }
+.chip .tok { display: inline-block; width: 2.1cqw; height: 2.1cqw; vertical-align: -0.5cqw; margin-right: .5cqw; }
+.chip .tok svg { width: 100%; height: 100%; display: block; }
+
+/* Consequences of a decision. */
+.result-wrap { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 2.4cqw; align-items: start; }
+.result-wrap:has(> :only-child) { grid-template-columns: 1fr; }
+.changes { background: rgba(12,18,16,.72); border: 1px solid rgba(255,255,255,.12); border-radius: .9cqw; padding: 1.2cqw 1.4cqw; font-family: var(--f-ui); font-size: 1.75cqw; display: grid; gap: .6cqw; }
+.changes-h { margin: 0 0 .3cqw; font-size: 1.3cqw; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+.chg { display: grid; grid-template-columns: 2.2cqw 1fr; gap: .6cqw; align-items: baseline; animation: rise .45s ease-out both; }
+.chg span { font-weight: 600; text-align: center; }
+.chg.good span { color: var(--green); }
+.chg.bad span { color: var(--red); }
+.chg.death { color: var(--silver); font-weight: 600; }
+.chg.death span { color: var(--silver); }
+.chg.neutral span { color: var(--dim); }
+
+/* The chronicle overlay on the TV. */
+.chron { position: absolute; top: 2cqw; right: 2cqw; bottom: 4cqw; width: 40cqw; overflow-y: auto; background: rgba(10,15,13,.94); border: 1px solid var(--gold); border-radius: 1cqw; padding: 1.4cqw; font-size: 1.55cqw; }
+.chron-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1cqw; font-family: var(--f-display); font-size: 2.4cqw; color: var(--gold); }
+.chron-head button { font-size: 1.3cqw; }
+.chron-item { border-top: 1px solid rgba(255,255,255,.1); padding: .9cqw 0; display: grid; gap: .4cqw; }
+.chron-t { color: var(--dim); font-size: 1.3cqw; letter-spacing: .06em; text-transform: uppercase; }
+.chron-c { color: var(--gold); }
+
+/* Phone chronicle list. */
+.phone-chron .chron-item { font-size: 14px; }
+.phone-chron .chron-t { font-size: 12px; }
+.phone-chron .chg { grid-template-columns: 18px 1fr; font-size: 14px; animation: none; }
+
 /* ---------- narrator ---------- */
 #narrator { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 12.5px; }
 #narrator h3 { font-family: var(--f-display); font-weight: 400; font-size: 17px; margin: 4px 0 8px; }

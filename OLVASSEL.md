@@ -42,8 +42,8 @@ aztán nyisd meg: http://localhost:8801
 - Ha a telefonok és a laptop egy wifin vannak, és a laptopon a helyi szerver fut: indítsd így:
   `python -m http.server 8801 --bind 0.0.0.0`, a laptop IP-címét a `ipconfig` parancs mutatja (pl. 192.168.1.23),
   és a telefonoldal címe legyen `http://192.168.1.23:8801/telefon.html`.
-- Vagy töltsd fel a játékot a GitHub Pages-re (pl. `puxi63.github.io/csendes-ej/`) **zene nélkül**, és a telefonoldal
-  címe legyen `https://puxi63.github.io/csendes-ej/telefon.html`. Ez az alapértelmezés, ha a játékot fájlból nyitod meg.
+- Vagy töltsd fel a játékot a GitHub Pages-re (pl. `puxi63.github.io/roxfortkaracsony/`) **zene nélkül**, és a telefonoldal
+  címe legyen `https://puxi63.github.io/roxfortkaracsony/telefon.html`. Ez az alapértelmezés, ha a játékot fájlból nyitod meg.
 
 **Egyedül próbálnád ki?** **Próba egy gépen**: a lobbyban a **Telefon megnyitása itt** gombbal annyi „telefont”
 nyithatsz új böngészőlapon, amennyit akarsz. Ehhez internet sem kell.

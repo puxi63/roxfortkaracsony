@@ -71,7 +71,7 @@
         },
         defense: 0, powersPending: [], powersUsed: 0, extensions: 0, extensionBy: [],
         qa: [], sceneLog: {}, eventsPlan: [], visionScene: {}, visionsSeen: [], crossCount: {},
-        forcedSpot: null, excludeStar: null, lastAlone: [], missing: null, cmdResults: {}, deaths: []
+        forcedSpot: null, excludeStar: null, lastAlone: [], missing: null, cmdResults: {}, deaths: [], chronicle: []
       };
       this.log('setup', `Létszám: ${n}, seed: ${this.seed}, áruló: ${players[tIdx].name}`);
       return this.s;
@@ -284,6 +284,7 @@
       if (sc.clockSet != null) s.clock = sc.clockSet;
       this.cur = { id, sc, out: [], ev: { frozen: [], wounded: [], dying: [] }, d: null, halfWatch: false, noSneak: false };
       if (s.noSneakNext) { this.cur.noSneak = true; s.noSneakNext = false; }
+      this.cur.pub0 = this.publicSnap();
       s.sceneLog[id] = s.sceneLog[id] || [];
       if (sc.enter) sc.enter(this);
       const dec = typeof sc.decision === 'function' ? sc.decision(this) : sc.decision;
@@ -311,7 +312,7 @@
       if (sc.postSecrets) (sc.postSecrets(this, d) || []).forEach((x) => x && this.secret(x.to, x.text, x.kind, x.style));
       this.s.lastAlone = d.alone || [];
 
-      await this.io.result({ scene: sc, id, d, out: this.cur.out.slice() });
+      await this.io.result({ scene: sc, id, d, out: this.cur.out.slice(), changes: this.diffPublic(this.cur.pub0, this.publicSnap()) });
       this.check(tok);
       if (sc.after) await sc.after(this, d, tok);
       this.check(tok);
@@ -324,9 +325,76 @@
           if (p.away === 0 && p.status === 'bezarva') p.status = 'el';
         }
       });
+      this.addChronicle(sc, d);
       const next = (d.option && d.option.next) || (typeof sc.next === 'function' ? sc.next(this, d) : sc.next);
       this.io.update();
       return next;
+    }
+
+    // ---------- public consequences and the chronicle ----------
+
+    publicSnap() {
+      const pub = {};
+      Object.keys(CE.PUBLIC_FLAGS || {}).forEach((k) => { pub[k] = this.f[k] || 0; });
+      pub.kard_hol = this.f.kard_hol || null;
+      return { flags: pub, players: this.players.map((p) => ({ hp: p.hp, status: p.status, escaped: !!p.escaped })) };
+    }
+
+    // Lists what everyone may see changed between two public snapshots.
+    diffPublic(a, b) {
+      if (!a || !b) return [];
+      const out = [];
+      b.players.forEach((nb, i) => {
+        const na = a.players[i];
+        const p = this.players[i];
+        if (!na) return;
+        if (nb.status !== na.status) {
+          if (nb.status === 'szellem') out.push({ who: p.name, text: `${p.name} meghalt. Szellem lett.`, tone: 'death' });
+          else if (nb.status === 'haldoklik') out.push({ who: p.name, text: `${p.name} haldoklik`, tone: 'bad' });
+          else if (nb.status === 'dermedt') out.push({ who: p.name, text: `${p.name} megdermedt`, tone: 'bad' });
+          else if (nb.status === 'bezarva') out.push({ who: p.name, text: `${p.name} a pincébe került`, tone: 'neutral' });
+          else if (nb.status === 'el' && (na.status === 'haldoklik' || na.status === 'dermedt')) out.push({ who: p.name, text: `${p.name} megmenekült`, tone: 'good' });
+          else if (nb.status === 'el' && na.status === 'bezarva') out.push({ who: p.name, text: `${p.name} kijött a pincéből`, tone: 'neutral' });
+        } else if (nb.status === 'el' && nb.hp !== na.hp) {
+          const dlt = nb.hp - na.hp;
+          out.push({ who: p.name, text: `${p.name}: ${dlt > 0 ? '+' : '−'}${Math.abs(dlt)} ♥`, tone: dlt > 0 ? 'good' : 'bad' });
+        }
+        if (nb.escaped && !na.escaped) out.push({ who: p.name, text: `${p.name} eltűnt a pincéből`, tone: 'bad' });
+      });
+      Object.entries(CE.PUBLIC_FLAGS || {}).forEach(([k, def]) => {
+        const va = a.flags[k] || 0;
+        const vb = b.flags[k] || 0;
+        if (va === vb) return;
+        if (def.counter) {
+          const dlt = vb - va;
+          const better = def.good ? dlt > 0 : dlt < 0;
+          out.push({ text: `${def.counter}: ${dlt > 0 ? '+' : '−'}${Math.abs(dlt)} (${vb})`, tone: better ? 'good' : 'bad' });
+        } else if (vb && !va) {
+          out.push({ text: def.on, tone: def.good ? 'good' : 'bad' });
+        }
+      });
+      if (a.flags.kard_hol !== b.flags.kard_hol && b.flags.kard_hol) {
+        if (b.flags.kard_hol === 'csapat') out.push({ text: 'Griffendél kardja a csapatnál van', tone: 'good' });
+        if (b.flags.kard_hol === 'bellatrix') out.push({ text: 'Bellatrix megszerezte a kardot', tone: 'bad' });
+      }
+      return out;
+    }
+
+    choiceText(d) {
+      if (!d) return null;
+      if (d.option && d.option.t) return d.option.t;
+      if (d.target !== undefined) return d.target ? `A pincébe: ${d.target.name}` : 'Senkit nem zártak be';
+      if (d.volunteer !== undefined) return d.volunteer ? `${d.volunteer.name} vállalta` : 'Senki nem vállalta';
+      return null;
+    }
+
+    addChronicle(sc, d) {
+      const changes = this.diffPublic(this.cur.pub0, this.publicSnap());
+      const choice = this.choiceText(d);
+      if (!changes.length && !choice) return;
+      this.s.chronicle = this.s.chronicle || [];
+      this.s.chronicle.push({ id: sc.id, act: this.s.act, time: this.clockText(), title: sc.title || sc.id, choice, changes });
+      this.io.chronicle && this.io.chronicle(this.s.chronicle);
     }
 
     startAct(act) {

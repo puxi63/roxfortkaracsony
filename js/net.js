@@ -55,7 +55,8 @@
     return {
       name: p.name, role: CE.ROLES[p.role].name, sym: CE.ROLES[p.role].sym, hp: p.hp, status: p.status, away: p.away > 0,
       items: p.items.map((i) => (CE.ITEMS[i] ? CE.ITEMS[i].name : i)), map: g.mapHolder() === p,
-      pages: CE.pages(g, p), inbox: p.inbox.slice(-12), clock: g.clockText(), scene: sc.title || ''
+      pages: CE.pages(g, p), inbox: p.inbox.slice(-12), clock: g.clockText(), scene: sc.title || '',
+      chronicle: (g.s.chronicle || []).slice(-20)
     };
   }
 
@@ -119,7 +120,7 @@
 
     defaultBase() {
       if (/^https?:/.test(location.protocol)) return location.href.replace(/[^/]*([?#].*)?$/, '') + 'telefon.html';
-      return 'https://puxi63.github.io/csendes-ej/telefon.html';
+      return 'https://puxi63.github.io/roxfortkaracsony/telefon.html';
     },
 
     seatOf(id) {

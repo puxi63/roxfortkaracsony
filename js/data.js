@@ -272,6 +272,31 @@
     dawn: 'zene-9.mp3' // Leaving Hogwarts
   };
 
+  // Public consequences: flag changes everyone may see on the TV and in the chronicle.
+  // Passage "open" flags are left out on purpose: a sneaking traitor opens them in secret.
+  CE.PUBLIC_FLAGS = {
+    boszorkany_lezarva: { on: 'A púpos boszorkány átjárója lezárva', good: true },
+    ablak_lezarva: { on: 'A torony ablaka lezárva', good: true },
+    fuz_lezarva: { on: 'A Fúriafűz alagútja beomlott', good: true },
+    vadkan_lezarva: { on: 'A Szárnyas Vadkan felé vezető út lezárva', good: true },
+    bellatrix_ismert: { on: 'Tudjátok: Bellatrix Lestrange van odakint', good: true },
+    belso_arulo: { on: 'Bizonyíték: valaki belülről segíti őket', good: true },
+    hagrid_figyel: { on: 'Hagrid figyeli a parkot', good: true },
+    jelolt_ismert: { on: 'Kiderült: megjelölték a mugliszületésűeket', good: true },
+    fenrir_terv: { on: 'Tudjátok, mikor és honnan jönnek', good: true },
+    fenrir_sebesult: { on: 'Szürkehátú Fenrir megsebesült', good: true },
+    edzes: { on: 'Gyakoroltátok a patrónust', good: true },
+    dumbledore_uzenet: { on: 'Üzenet ment Dumbledore-nak', good: true },
+    piton_segitett: { on: 'Piton közbelépett', good: true },
+    pancelok: { on: 'A páncélok harcba indultak', good: true },
+    fawkes: { on: 'Megérkezett Fawkes', good: true },
+    szetvaltak: { on: 'A csapat szétvált', good: false },
+    tamadas_volt: { on: 'A dementor támadott', good: false },
+    dumbledore_hu: { counter: 'Hűség Dumbledore-hoz', good: true },
+    ostrom: { counter: 'Az ostrom ereje (dér)', good: false },
+    frics_gyanakszik: { counter: 'Frics gyanakvása', good: false }
+  };
+
   CE.FILLERS = ['Megmelegíted a kezed a fáklyánál', 'Megigazítod a sáladat', 'Lerázod a havat a talárodról', 'Hallgatod a szelet', 'Megkötöd a cipőfűződet', 'Számolod a lépcsőfokokat'];
   CE.WHISPERS = ['Bízz', 'Ne bízz', 'Vigyázz', 'Menj', 'Maradj', 'Siess'];
 
