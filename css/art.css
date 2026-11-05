@@ -276,6 +276,22 @@
   background: radial-gradient(closest-side, rgba(255,220,160,.65), rgba(255,170,110,.22) 55%, rgba(255,170,110,0));
   animation: art-da-sun 6s ease-out both, art-pulse 7s 6s ease-in-out infinite alternate; }
 
+/* ---------- per-game variant (CE.art.setVariant) ---------- */
+/* Mood: one static, plain-alpha tint over the whole background, under the scrim (no blend modes or
+   filters, so the animated layers below stay cheap). Tints only darken or shift hue, never brighten
+   the text area. */
+.art-mood { position: absolute; inset: 0; pointer-events: none; }
+.art-mood--moon { background:
+  radial-gradient(ellipse 46% 42% at 84% 6%, rgba(206,224,242,.1), rgba(206,224,242,0) 70%),
+  linear-gradient(to bottom, rgba(36,56,86,.16), rgba(18,28,46,.12)); }
+.art-mood--dusk { background: linear-gradient(to bottom, rgba(66,36,108,.24), rgba(46,24,70,.14) 55%, rgba(22,10,34,.18)); }
+.art-mood--candle { background:
+  radial-gradient(ellipse 80% 60% at 50% 100%, rgba(255,150,70,.1), rgba(255,150,70,0) 70%),
+  linear-gradient(to bottom, rgba(62,30,8,.16), rgba(62,30,8,.08)); }
+/* Snowfall: light thins the flakes; heavy gets an extra large-flake layer from js/art.js. */
+.art-wx--light .art-snow .art-flakes--a { opacity: .42; }
+.art-wx--light .art-snow .art-flakes--b { opacity: .6; }
+
 /* ---------- pause / stop ---------- */
 /* .art-still on any ancestor freezes every art animation (e.g. a "low power" switch). */
 .art-still *, .art-still *::before, .art-paused *, .art-paused *::before { animation-play-state: paused !important; }

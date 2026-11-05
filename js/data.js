@@ -31,9 +31,11 @@
     terkep: { name: 'Tekergők Térképe', text: 'A kastély minden lakója rajta van.' },
     karamella: { name: 'Házi karamella', text: 'Mrs. Weasley küldte. Egy sebet gyógyít.' },
     sapka: { name: 'Kötött sapka', text: 'Kicsit szúr. Kicsit nagy. Melegen tart.' },
-    tukorszilank: { name: 'Tükörszilánk', text: 'Aberforth adta. Ha baj van, belenézel, és ő átjön.' }
+    tukorszilank: { name: 'Tükörszilánk', text: 'Aberforth adta. Ha baj van, belenézel, és ő átjön.' },
+    vajsor: { name: 'Vajsör', text: 'Egy üveg a Három Seprűből. Átmelegít: egy sebet gyógyít, neked vagy annak, akinek odaadod.' },
+    drazse: { name: 'Bogoly Berti-féle Mindenízű Drazsé', text: 'Minden ízben. Tényleg mindenben. Jó megkínálni vele valakit.' }
   };
-  CE.FIRST_GIFTS = ['csoki', 'csoki', 'pulover', 'bezoar', 'kopeny', 'gyanuszkop', 'pergamen'];
+  CE.FIRST_GIFTS = ['csoki', 'csoki', 'pulover', 'bezoar', 'kopeny', 'gyanuszkop', 'pergamen', 'vajsor', 'drazse'];
   CE.UNIQUE_GIFTS = ['kopeny', 'gyanuszkop', 'pergamen'];
 
   // Player-count scaling (script part 1, 2.8).
@@ -218,6 +220,63 @@
       options: [
         { k: 'A', t: 'Visszaadom McGonagallnek', res(g) { g.f.palca_orzo = 'mcgonagall'; } },
         { k: 'B', t: 'Megtartom', res(g, p) { p.patronusBonus += 10; } }
+      ]
+    },
+    {
+      // Butterbeer: drink it or warm up someone wounded. Kindness to a cursed student loosens the curse.
+      id: 'U11', t: 'Nálad van egy üveg vajsör. Még meleg.',
+      trigger: (g, p, ev) => p.items.includes('vajsor') && (p.hp < 3 || ev.wounded.some((x) => x !== p && x.status === 'el')),
+      options: [
+        { k: 'A', t: 'Megiszom', res(g, p) { g.takeItem(p, 'vajsor'); g.heal(p, 1); g.say(`${p.name} megitta a vajsörét, és átmelegedett.`); } },
+        { k: 'B', t: 'Megtartom', res() {} },
+        {
+          k: 'C', t: 'Odaadom egy sebesültnek',
+          res(g, p, ev) {
+            const x = ev.wounded.find((y) => y !== p && y.status === 'el') || g.present().find((y) => y !== p && y.hp < 3);
+            if (!x) return;
+            g.takeItem(p, 'vajsor');
+            g.heal(x, 1);
+            if (x.traitor || x.traitor2) g.resist(x, 1);
+            g.say(`${p.name} odaadta a vajsörét. ${x.name} két kézzel fogja az üveget, és átmelegszik.`);
+          }
+        }
+      ]
+    },
+    {
+      // Every Flavour Beans: offering them to the cursed student counts as kindness.
+      id: 'U12', t: 'A zsebedben egy doboz Bogoly Berti-féle Mindenízű Drazsé. Valaki sóvárogva nézi.',
+      trigger: (g, p) => p.items.includes('drazse') && g.present().length > 1 && g.rng.chance(35),
+      options: [
+        {
+          k: 'A', t: 'Megkínálom',
+          res(g, p) {
+            const x = g.rng.pick(g.present().filter((y) => y !== p));
+            if (!x) return;
+            g.takeItem(p, 'drazse');
+            const taste = g.rng.pick(['fülzsír', 'spenót', 'pirítós', 'szardínia', 'bors', 'eper', 'karamell']);
+            g.say(`${p.name} körbekínálja a drazsét. ${x.name} ${taste} ízűt fog ki, és mindenki nevet.`);
+            if (x.traitor || x.traitor2) g.resist(x, 1);
+            else g.f.jokedv = 1;
+          }
+        },
+        { k: 'B', t: 'Megtartom', res() {} }
+      ]
+    },
+    {
+      // A portrait saw someone in the night: a true clue for the price of Filch's suspicion.
+      id: 'U13', t: 'Egy portré utánad szól a sötét folyosón: „Láttam ám valakit az éjjel. Kíváncsi vagy, ki volt?”',
+      trigger: (g, p) => !g.s.portraitSeen && g.s.act >= 1 && !g.isEvil(p) && g.s.history.length > 8 && g.rng.chance(4) && (g.s.portraitSeen = true),
+      options: [
+        {
+          k: 'A', t: 'Megállok, és megkérdezem',
+          res(g, p) {
+            const t = g.players.find((x) => x.traitor);
+            const sneaked = !!t && Object.values(g.s.sceneLog).some((acts) => acts.some((a) => a.actor === t.id && a.kind === 'sneak'));
+            g.secret(p, sneaked ? `A portré szerint az éjjel egy ${g.roleName(t).toLowerCase()} szerepű diák osont el előtte.` : 'A portré szerint az éjjel csak Hóborc járt arra. Diák egy sem.', 'igaz');
+            g.add('frics_gyanakszik', 1);
+          }
+        },
+        { k: 'B', t: 'Továbbmegyek', res() {} }
       ]
     }
   ];

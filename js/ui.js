@@ -359,6 +359,8 @@
       const seed = this.net ? 1 + Math.floor(Math.random() * 99999) : (+$('sSeed').value || 1);
       this.game = new CE.Game({ settings, io: this.io, seed });
       this.game.botRng = new CE.Rng(seed * 7 + 3);
+      // Each game gets its own look (mood, weather, decorations); the same seed gives the same look.
+      if (CE.art && CE.art.setVariant) { CE.art.setVariant(seed); this.artBg = this.artKey = null; }
       this.game.setup();
       $('setup').hidden = true;
       $('app').hidden = false;

@@ -251,7 +251,11 @@
       const out = [];
       const r = g.cur.rider;
       if (r) out.push(g.f.dumbledore_uzenet ? `Az ablak előtt szárnysuhogás. ${r.name} csapzottan, jéggel a hajában mászik be. „Átjutottam. Dumbledore tudja.”` : `Az ablak előtt szárnysuhogás. ${r.name} csapzottan, jéggel a hajában mászik be. Nem szól semmit, csak a fejét rázza.`);
-      out.push('Éjfél. A Nagy Terem fáin a gyertyák csonkig égtek. McGonagall professzor a terem közepén áll, pálcával a kezében.');
+      out.push(CE.V('III-0', [
+        'Éjfél. A Nagy Terem fáin a gyertyák csonkig égtek. McGonagall professzor a terem közepén áll, pálcával a kezében.',
+        'Éjfél. A toronyóra tizenkettőt üt, a hangja beleremeg a falakba. McGonagall professzor a terem közepén áll, pálcával a kezében.',
+        'Éjfél. A varázsolt mennyezeten nem látszik egy csillag sem, csak a vihar. McGonagall professzor a terem közepén áll, pálcával a kezében.'
+      ])(g));
       out.push('„Piertotum Locomotor!” A folyosókon a páncélok, amelyek tegnap még karácsonyi dalokat énekeltek, megcsikordulnak, leugranak a talapzatukról, és csörömpölve a kapu felé masíroznak.');
       return out;
     },
@@ -412,8 +416,12 @@
   add({
     id: 'III-2', act: 3, title: 'A lépcsők', place: 'A mozgó lépcsők', clockSet: DAY3 + 60, music: 'dark',
     enter(g) { g.add('ostrom', 1); marks(g); },
-    narr: [
-      'A halálfalók a lépcsőkön jönnek felfelé. A lépcsők mozognak, ahogy mindig, de most mintha szándékosan választanának szét titeket.',
+    narr: (g) => [
+      CE.V('III-2', [
+        'A halálfalók a lépcsőkön jönnek felfelé. A lépcsők mozognak, ahogy mindig, de most mintha szándékosan választanának szét titeket.',
+        'Lépések dobognak alattatok. A halálfalók a mozgó lépcsőkön jönnek fel, a lépcsők nyikorogva fordulnak, és szétszakítják a csapatot.',
+        'A lépcsőházban a portrék elmenekülnek a képeikből. Lent halálfalók jönnek felfelé, és a lépcsők, mintha ők is félnének, össze-vissza fordulnak.'
+      ])(g),
       'Egy átok zöld fénye villan el a fejetek fölött.',
       'ÁTOK!'
     ],

@@ -115,7 +115,17 @@
       fx(g) { const k = g.byRole('kisertet'); if (k) g.secret(k, 'Myrtle szerint valaki ma éjjel a harmadik emeleten sziszegve mondott egy szót.', 'igaz'); }
     },
     { id: 'S7', title: 'Piton', narr: 'Piton professzor egy bájitalos üveget rejt a talárjába, amikor meglát titeket.' },
-    { id: 'S8', title: 'A páncélok', narr: 'A páncélok a folyosón egyszerre fordulnak a bejárat felé, és elhallgatnak.', fx(g) { g.add('ostrom', 1); } }
+    { id: 'S8', title: 'A páncélok', narr: 'A páncélok a folyosón egyszerre fordulnak a bejárat felé, és elhallgatnak.', fx(g) { g.add('ostrom', 1); } },
+    { id: 'S13', title: 'Hagrid hóembere', narr: 'Hagrid hatalmas hóembert épít a bejárat elé. A fején egy vödör, a nyakában Hagrid sála. A vihar egy óra alatt betemeti.' },
+    {
+      id: 'S14', title: 'Flitwick hópelyhei', narr: 'Flitwick professzor int a pálcájával, és a Nagy Teremben hulló hópelyhek egy pillanatra megállnak a levegőben, majd csillagokká rendeződnek. Egy percre mindenki elfelejti a vihart.',
+      fx(g) { g.present().forEach((p) => { p.patronusBonus += 5; }); return 'Ma este mindenkinek könnyebben jut eszébe egy boldog emlék.'; }
+    },
+    {
+      id: 'S15', title: 'Mrs. Norris', narr: 'Mrs. Norris egész délután egyetlen ajtó előtt ül, és fúj, ha bárki a közelébe megy.',
+      fx(g) { const p = g.rng.pick(g.present().filter((x) => !g.isEvil(x))); if (p) g.secret(p, `Mrs. Norris egész délután ${g.f.fuz_lezarva ? 'a hetedik emeleten, egy üres fal előtt' : 'a park felé néző ajtó előtt'} ült.`, 'hangulat'); }
+    },
+    { id: 'S16', title: 'Dementorok', narr: 'A park fölött dementorok köröznek. Az ablaküvegen jégvirág nő, belülről.', fx(g) { g.add('ostrom', 1); } }
   ];
 
   // ---------- II-0: Christmas morning ----------
@@ -226,12 +236,23 @@
 
   add({
     id: 'II-1', title: 'A lakoma', place: 'Nagy Terem, délben', clockSet: DAY + 12 * 60, music: 'carol',
-    narr: [
-      'Délben a Nagy Teremben terített asztal vár. Pulykák, sült krumpli, karácsonyi puding, és varázsdurranók, amelyek ágyúlövésként pukkannak.',
-      'A mennyezetről hó hull. Flitwick egy virágos boszorkánykalapot visel, amit a durranóból húzott. Hagrid könnyes szemmel áll fel.',
-      '„Dumbledore professzorra! Bárhol is van most!”',
-      'A tanári asztal közepén egy palack áll, masnival: tölgyfahordós mézbor, Dumbledore professzornak, ajándékba.'
-    ],
+    narr: CE.V('II-1', [
+      [
+        'Délben a Nagy Teremben terített asztal vár. Pulykák, sült krumpli, karácsonyi puding, és varázsdurranók, amelyek ágyúlövésként pukkannak.',
+        'A mennyezetről hó hull. Flitwick egy virágos boszorkánykalapot visel, amit a durranóból húzott. Hagrid könnyes szemmel áll fel.',
+        '„Dumbledore professzorra! Bárhol is van most!”', 'A tanári asztal közepén egy palack áll, masnival: tölgyfahordós mézbor, Dumbledore professzornak, ajándékba.'
+      ],
+      [
+        'Délben a Nagy Teremben a karácsonyi lakoma vár: száz kövér sült pulyka, sült krumpli, mártás és lángoló karácsonyi puding. A varázsdurranók nem pukkannak, hanem ágyúként dörrennek.',
+        'A mennyezetről hó hull. Flitwick professzor egy boszorkánykalapot visel, a durranóból húzta. Hagrid a poharát emelve áll fel.',
+        '„Dumbledore professzorra! Bárhol is van most!”', 'A tanári asztal közepén egy palack áll, masnival: tölgyfahordós mézbor, Dumbledore professzornak, ajándékba.'
+      ],
+      [
+        'Délben megterítenek a Nagy Teremben. Pulyka, kis kolbászkák, sült krumpli, karácsonyi puding. Az egyik varázsdurranóból egy tengernagyi kalap és néhány élő fehér egér kerül elő.',
+        'A mennyezetről hó hull. Flitwick vidáman felveszi a virágos kalapot. Hagrid könnyes szemmel áll fel.',
+        '„Dumbledore professzorra! Bárhol is van most!”', 'A tanári asztal közepén egy palack áll, masnival: tölgyfahordós mézbor, Dumbledore professzornak, ajándékba.'
+      ]
+    ]),
     // Everyone pulls a cracker on the phone.
     async before(g, tok) {
       const pres = g.present();
@@ -663,8 +684,12 @@
 
   add({
     id: 'II-4', title: 'Este: melyik ajtó?', place: 'Nagy Terem, sötétedéskor', clockSet: DAY + 18 * 60, music: 'storm',
-    narr: [
-      'Besötétedik. McGonagall szerint a kastélynak három titkos ajtaja van, amely kifelé vezet. Az egyiket már ismeritek: a púpos boszorkányét.',
+    narr: (g) => [
+      CE.V('II-4', [
+        'Besötétedik. McGonagall szerint a kastélynak három titkos ajtaja van, amely kifelé vezet. Az egyiket már ismeritek: a púpos boszorkányét.',
+        'Délután négykor már sötét van. McGonagall professzor összehívja a megmaradtakat: a kastélyból három titkos út vezet kifelé. Az egyiket már ismeritek: a púpos boszorkányét.',
+        'Odakint gyorsan sötétedik, a vihar újra erősödik. McGonagall halkan beszél: három titkos ajtó vezet ki a kastélyból. Az egyiket már ismeritek: a púpos boszorkányét.'
+      ])(g),
       'A második a Fúriafűz alatt kezdődik, és a Szellemszállásba visz.',
       'A harmadik a Szükség Szobájából indul, és Roxmortsba, a Szárnyas Vadkanba vezet.',
       'Hagrid pedig azt mondja, ha valaki üzenni akar Dumbledore-nak a viharon át, annak a thesztrálok segíthetnek.'
@@ -1056,13 +1081,14 @@
   add({
     id: 'II-5', title: 'Karácsonyi ének és a terv', place: 'Nagy Terem, este tíz', clockSet: DAY + 22 * 60, music: 'carol',
     enter(g) { g.s.group = null; g.s.split = null; },
-    narr: [
-      'Este tíz óra. Akik visszaértetek, a Nagy Teremben gyűltök össze. A fák gyertyái még égnek, a mennyezetről hó hull.',
-      'Senki nem mondta, hogy idejöjjetek. Mégis itt vagytok.',
-      'A folyosón a páncélok is énekelnek, halkan. Két óra múlva éjfél.',
+    narr: (g) => CE.V('II-5', [
+      ['Este tíz óra. Akik visszaértetek, a Nagy Teremben gyűltök össze. A fák gyertyái még égnek, a mennyezetről hó hull.', 'Senki nem mondta, hogy idejöjjetek. Mégis itt vagytok.', 'A folyosón a páncélok is énekelnek, halkan. Két óra múlva éjfél.'],
+      ['Este tíz óra. A Nagy Teremben gyűltök össze, akik visszaértetek. A karácsonyfákon még égnek a gyertyák, a varázsolt mennyezeten hóviharos az ég.', 'Senki nem hívott ide. Mégis mindenki eljött.', 'Valahol a folyosón egy páncél halkan dúdol. Két óra múlva éjfél.'],
+      ['Este tíz óra. Akik visszaértetek, a Nagy Terem hosszú asztalánál ültök. A tűz pattog, a gyertyák lángja meg-meglebben, pedig nincs huzat.', 'Nem beszéltétek meg, hogy idejöttök. Mégis itt vagytok, mindannyian.', 'A páncélok a folyosón most nem énekelnek. Két óra múlva éjfél.']
+    ])(g).concat([
       'McGonagall professzor feláll. „Éjfélkor jönnek. Tudom, hogy nem kellene diákokat kérnem erre. De nincs más.',
       'Hogyan védjük meg a kastélyt?”'
-    ],
+    ]),
     secrets(g) {
       const out = traitorSecret(g, 'Énekelnek. Milyen aranyosak. Éjfélkor mind az enyémek.').map((x) => (x.to.resist >= 2 ? Object.assign(x, { text: `${x.text} …Ne sírj. Miért sírsz?` }) : x));
       const b = g.byRole('bajital');

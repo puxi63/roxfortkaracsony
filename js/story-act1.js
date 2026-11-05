@@ -168,12 +168,26 @@
 
   add({
     id: 'P1', act: 0, title: 'A lista', place: 'Roxfort, december', clockSet: 9 * 60, music: 'piano',
-    narr: [
-      'December. Roxfortban hetek óta a Reggeli Próféta címlapjáról beszél mindenki: halálfalók szöktek meg az Azkabanból. Köztük Bellatrix Lestrange.',
-      'A diákok sorra iratkoznak fel, hogy hazamenjenek karácsonyra. Otthon biztonságosabb, mondják a szülők.',
-      'McGonagall professzor listáján, azok között, akik itt maradnak, alig néhány név áll. A tiétek.',
-      'Vegyétek kézbe a telefont, és takarjátok el. Nézzétek meg a lapjaitokat: kik vagytok.'
-    ],
+    narr: CE.V('P1', [
+      [
+        'December. Roxfortban hetek óta a Reggeli Próféta címlapjáról beszél mindenki: halálfalók szöktek meg az Azkabanból. Köztük Bellatrix Lestrange.',
+        'A diákok sorra iratkoznak fel, hogy hazamenjenek karácsonyra. Otthon biztonságosabb, mondják a szülők.',
+        'McGonagall professzor listáján, azok között, akik itt maradnak, alig néhány név áll. A tiétek.',
+        'Vegyétek kézbe a telefont, és takarjátok el. Nézzétek meg a lapjaitokat: kik vagytok.'
+      ],
+      [
+        'December. A Reggeli Próféta címlapján mozgó fényképek: halálfalók, akik megszöktek az Azkabanból. A legtöbben Bellatrix Lestrange képét nézik. A képen nevet.',
+        'A bagolyposta naponta hozza a szülők leveleit: gyertek haza karácsonyra. A diákok sorra iratkoznak fel.',
+        'McGonagall professzor listáján, azok között, akik a kastélyban töltik az ünnepet, csak néhány név maradt. A tiétek.',
+        'Vegyétek kézbe a telefont, és takarjátok el. Nézzétek meg a lapjaitokat: kik vagytok.'
+      ],
+      [
+        'December. A Nagy Teremben suttogva adják kézről kézre a Reggeli Prófétát: halálfalók szöktek meg az Azkabanból, köztük Bellatrix Lestrange.',
+        'A Roxfort Expressz karácsonyra szinte az egész iskolát hazaviszi. Otthon biztonságosabb, írják a szülők.',
+        'McGonagall professzor szigorúan végignéz a listán. Akik itt maradnak: alig néhány név. A tiétek.',
+        'Vegyétek kézbe a telefont, és takarjátok el. Nézzétek meg a lapjaitokat: kik vagytok.'
+      ]
+    ]),
     decision: { type: 'ack', prompt: 'Nézd meg a lapjaidat (tartsd nyomva a gombot), aztán nyomd meg:', label: 'Elolvastam', time: 60 },
     next: 'P2'
   });
@@ -293,15 +307,32 @@
     { id: 'S1', title: 'Hóborc', narr: 'Hóborc tintát borít a lépcsőre, és dalban kiabálja a neveteket. Frics két emelettel lejjebb is hallja.', fx(g) { g.add('frics_gyanakszik', 1); } },
     { id: 'S2', title: 'A Kövér Dáma', narr: 'A Kövér Dáma a barátnőjével ünnepel, kicsit sokat ivott, és nem enged be senkit, amíg el nem énekeltek vele egy karácsonyi dalt. Mindannyian ott álltok a portré előtt.', fx(g) { g.s.noSneakNext = true; } },
     { id: 'S3', title: 'Félig Fej Nélküli Nick', narr: 'Félig Fej Nélküli Nick megkérdezi, nem fáztok-e. Ő is érzi, hogy a harmadik emeleten huzat van.', fx(g) { const p = g.rng.pick(loyal(g)); if (p) g.secret(p, 'Nick szerint a huzat a púpos boszorkány szobra felől jön.', 'igaz'); } },
-    { id: 'S4', title: 'Piton', narr: 'Piton professzor elsuhan, és hosszan végignéz rajtatok. Egy szót sem szól.' }
+    { id: 'S4', title: 'Piton', narr: 'Piton professzor elsuhan, és hosszan végignéz rajtatok. Egy szót sem szól.' },
+    {
+      id: 'S9', title: 'A Szürke Hölgy', narr: 'A Szürke Hölgy átsuhan a falon. Megáll egy ablak előtt, ahonnan a Roxmortsba vezető út látszik, és sokáig nézi. Aztán szó nélkül eltűnik.',
+      fx(g) { const p = g.rng.pick(loyal(g)); if (p) g.secret(p, 'A Szürke Hölgy elsuhanva odasúgta: ma éjjel valaki a kastélyból kifelé figyel, nem befelé.', 'hangulat'); }
+    },
+    {
+      id: 'S10', title: 'Forró csokoládé', narr: 'A konyhából házimanók jelennek meg a folyosón, tálcákon gőzölgő bögrékkel. Mindenki kap egy forró csokoládét.',
+      fx(g) { const w = g.present().find((p) => p.status === 'el' && p.hp < 3); if (w) { g.heal(w, 1); return `${w.name} keze végre nem remeg.`; } return null; }
+    },
+    {
+      id: 'S11', title: 'A Véres Báró', narr: 'A Véres Báró csörgő láncaival elvonul mellettetek. Hóborc, aki eddig a nyomotokban járt, rémülten elmenekül.',
+      fx(g) { g.add('frics_gyanakszik', -1); }
+    },
+    { id: 'S12', title: 'A baglyok', narr: 'A bagolyházból egyszerre száll fel minden bagoly, és a viharban körözni kezd a torony körül. Egyik sem mer elrepülni.' }
   ];
 
   // ---------- ACT I ----------
 
   add({
     id: 'I-0', act: 1, title: 'A vihar', place: 'Nagy Terem, szenteste', clockSet: 16 * 60, music: 'storm',
-    narr: [
-      'Szenteste délután. A hó megállás nélkül esik, a szél úgy üvölt a tornyok körül, mint egy sebzett állat. Ez nem természetes vihar.',
+    narr: (g) => [
+      CE.V('I-0', [
+        'Szenteste délután. A hó megállás nélkül esik, a szél úgy üvölt a tornyok körül, mint egy sebzett állat. Ez nem természetes vihar.',
+        'Szenteste délután. Reggel óta egyre sűrűbben esik a hó, most már a tornyok csúcsát sem látni. A szél süvít a mellvédek között. Ez nem természetes vihar.',
+        'Szenteste délután. A Nagy Terem ablakain túl csak fehérség kavarog, a Fekete-tó jegén hófúvások vonulnak. A szél egy pillanatra sem áll el. Ez nem természetes vihar.'
+      ])(g),
       'A Nagy Teremben egyszer csak ezüstös fény gyúl: egy fényből szőtt főnix száll le az asztalra. Dumbledore professzor patrónusa. Az ő hangján szól: „A Hop-hálózatot lezárták. Reggelig nem jutok vissza. Maradjatok együtt, és ne nyissatok ki semmit, ami…”',
       'A főnix szétfoszlik. A mondat vége elvész.',
       'Ugyanekkor három dolog történik a kastélyban. A harmadik emeleten a púpos boszorkány szobra mögül jeges huzat süvít. A Csillagvizsgáló-toronyban betört egy ablak, és dér kúszik lefelé a lépcsőn. Frics irodájából pedig ordítás hallatszik: valaki havat hordott be a kastélyba.'
@@ -595,7 +626,11 @@
 
   add({
     id: 'I-X1', act: 1, title: 'Szenteste a Nagy Teremben', place: 'Nagy Terem', clockSet: 19 * 60, music: 'carol',
-    narr: ['A Nagy Teremben tizenkét karácsonyfa áll, ágaikon gyertyák és aranyló gömbök. A mennyezetről hó hull, és elolvad, mielőtt elérné a fejeteket.', 'Egyetlen asztal van megterítve. McGonagall, Flitwick, Madam Pomfrey és Hagrid ül veletek. Piton professzor a sarokban, egy szót sem szól.', 'A folyosón a páncélok karácsonyi dalokat énekelnek, kicsit hamisan. Egy órára mintha minden rendben volna.'],
+    narr: CE.V('I-X1', [
+      ['A Nagy Teremben tizenkét karácsonyfa áll, ágaikon gyertyák és aranyló gömbök. A mennyezetről hó hull, és elolvad, mielőtt elérné a fejeteket.', 'Egyetlen asztal van megterítve. McGonagall, Flitwick, Madam Pomfrey és Hagrid ül veletek. Piton professzor a sarokban, egy szót sem szól.', 'A folyosón a páncélok karácsonyi dalokat énekelnek, kicsit hamisan. Egy órára mintha minden rendben volna.'],
+      ['A Nagy Termet tizenkét karácsonyfa díszíti, Hagrid hozta be őket a Rengetegből. Az ágakon valódi gyertyák égnek, a mennyezetről hó szállingózik, de nem ér le.', 'Egyetlen asztalnál ültök a tanárokkal: McGonagall, Flitwick, Madam Pomfrey, Hagrid. Piton professzor is itt van, a sarokban, és nem eszik semmit.', 'Kint a folyosón a páncélok karácsonyi dalokat énekelnek, a szöveg felét elfelejtik. Egy órára mintha minden rendben volna.'],
+      ['A Nagy Teremben tizenkét karácsonyfa csillog. Flitwick professzor pálcájából aranybuborékok szállnak a díszekre. A mennyezetről hó hull, és elolvad a levegőben.', 'Egyetlen asztal van megterítve. Hagrid egyre pirosabb, ahogy újabb pohár bort kér, McGonagall professzor mosolyog. Madam Pomfrey is nevet. Piton a sarokból figyel, szótlanul.', 'A folyosón a páncélok énekelnek, kicsit hamisan. Egy órára mintha minden rendben volna.']
+    ]),
     enter(g) {
       if (g.f.jokedv) { const w = g.players.find((p) => p.status === 'el' && p.hp < 3); if (w) g.heal(w, 1); }
       g.players.forEach((p) => { if (p.status === 'haldoklik' || p.status === 'dermedt') { p.status = 'el'; p.hp = Math.max(1, p.hp); p.dyingCause = null; } if (p.status === 'bezarva' && p.away <= 1) { p.status = 'el'; p.away = 0; } });
@@ -620,7 +655,11 @@
   add({
     id: 'I-X2', act: 1, title: 'Kialszanak a gyertyák', place: 'Folyosó a hálótermek felé', clockSet: 22 * 60, music: 'dark',
     narr(g) {
-      const base = 'Vacsora után, a hálótermek felé menet, egyszerre kialszik minden fáklya a folyosón. A lehelletetek fehér.';
+      const base = CE.V('I-X2', [
+        'Vacsora után, a hálótermek felé menet, egyszerre kialszik minden fáklya a folyosón. A leheletetek fehér.',
+        'Vacsora után a hálótermek felé tartotok, amikor a fáklyák egyenként kialszanak, mintha valaki elfújná őket. A leheletetek fehér.',
+        'A hálótermek felé menet a folyosón egyszerre sötét lesz. Kialudt minden fáklya. A kőfalon dér csillan, a leheletetek fehér.'
+      ])(g);
       if (g.f.ablak_nyitva) return [base, 'A lépcső tetején egy, kettő, három rongyos alak lebeg lefelé. A páncélok énekének utolsó hangja megfagy.', 'HIDEG ÁRAD!'];
       if (g.f.boszorkany_nyitva) return [base, 'A folyosó végén egy csuklyás alak áll. Ezüst álarc. A pálcája vége zölden izzik.', 'ÁTOK!'];
       return [base, 'Az ablak előtt, a viharban egy rongyos alak lebeg. Benéz. Aztán továbbsodródik. Ma éjjel még nem jutott be.'];

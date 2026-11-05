@@ -9,6 +9,12 @@
   CE.SCENES = CE.SCENES || {};
   CE.EVENTS = CE.EVENTS || {};
 
+  // Text variants: CE.V('P1', [a, b, c]) picks one version per game (each may be an array or a function of g).
+  CE.V = (key, list) => (g) => {
+    const v = list[g.variant(key, list.length)];
+    return typeof v === 'function' ? v(g) : v;
+  };
+
   const LOCKED_TYPES = ['ack', 'memory', 'text', 'suspicion', 'none'];
 
   class Game {
@@ -222,6 +228,13 @@
       if (this.cmdNow('K3')) opts.push('láttad: az üvegszilánkok kint voltak a párkányon. Belülről törték be.');
       if (!opts.length) opts.push('a hideg nem az ablak felől jött, hanem a lépcső felől.');
       return this.rng.pick(opts);
+    }
+
+    // Which version of a text this game uses; rolled once per key and kept in the state (snapshots keep it too).
+    variant(key, n) {
+      this.s.variants = this.s.variants || {};
+      if (this.s.variants[key] == null || this.s.variants[key] >= n) this.s.variants[key] = this.rng.int(n);
+      return this.s.variants[key];
     }
 
     text(x) {

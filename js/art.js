@@ -11,6 +11,10 @@
 //   player(name, opts)         round player token (<svg class="art-token">), opts.status: el|dermedt|haldoklik|szellem|bezarva
 //   forScene(id) / forEnding(key) / forEvent(id)   art entry { bg, chars, fx, patronus? }
 //   scene(id)                  background + characters + effects of a scene, as one string
+//   setVariant(seed)           per-game look (mood, snowfall, moon, decorations, alternative backgrounds);
+//                              integer seed → always the same look, null/undefined → default look.
+//                              Affects everything drawn after the call (redraw the TV once after it).
+//   getVariant()               the current variant as a plain object (null when none)
 // CE.SCENE_ART / CE.EVENT_ART / CE.ENDING_ART hold the mapping.
 //
 // Typical TV use (#tv is position: relative, 16:9, container-type: inline-size):
@@ -32,6 +36,15 @@
     let s = (seed >>> 0) || 1;
     return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
   }
+
+  // Per-game look (see setVariant near the public API). null = the default look, exactly as before.
+  let VAR = null;
+  // Great Hall tree styles (Prisoner of Azkaban: some trees glitter with tiny icicles, some with candles).
+  const TREE_STYLES = {
+    gold: { bauble: '#d6b261', light: '#ffe7a8', glow: 'gw' },
+    icicle: { bauble: '#cfdde8', light: '#e6f4ff', glow: 'gc' },
+    red: { bauble: '#c43a34', light: '#ffd890', glow: 'gw' }
+  };
 
   const stops = (list) => list.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}"${a === undefined ? '' : ` stop-opacity="${a}"`}/>`).join('');
   const lin = (id, list, x1 = 0, y1 = 0, x2 = 0, y2 = 1) => `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops(list)}</linearGradient>`;
@@ -81,6 +94,24 @@
       d[k] += `M${Math.round(x0 + rnd() * (x1 - x0))} ${Math.round(y0 + rnd() * (y1 - y0))}h0`;
     }
     return d.map((p, k) => (p ? `<path d="${p}" stroke="#eef4fa" stroke-linecap="round" stroke-width="${n1(maxR * (0.7 + k * 0.75))}" opacity="${n1(op * (0.45 + k * 0.25))}"/>` : '')).join('');
+  };
+
+  // Moon in a night sky (needs glowDefs(p)). keep = the background always had a moon: without a variant
+  // the original crescent is drawn; with one, phase / position / side come from the variant.
+  // Without keep, the moon only appears in variants that show it. The phase is cut with a mask, so it
+  // works on any sky colour.
+  P.moon = (p, keep = false) => {
+    const m = VAR ? VAR.moon : null;
+    if (!m) return keep ? `${glow(p, 'gc', 1290, 130, 170)}<circle cx="1290" cy="130" r="34" fill="#eef2f4"/><circle cx="1305" cy="121" r="31" fill="#0a1424"/>` : '';
+    if (!keep && !m.show) return '';
+    const x = n1(m.x);
+    const y = n1(m.y);
+    const full = m.phase === 'full';
+    let s = glow(p, 'gc', x, y, full ? 210 : 170, full ? 210 : 170, full ? 1 : 0.9);
+    if (full) return `${s}<circle cx="${x}" cy="${y}" r="34" fill="#eef2f4"/><g fill="#c6d0d8" opacity=".55"><circle cx="${n1(x - 9)}" cy="${n1(y - 7)}" r="9"/><circle cx="${n1(x + 11)}" cy="${n1(y + 9)}" r="7"/><circle cx="${n1(x + 6)}" cy="${n1(y - 14)}" r="4"/></g>`;
+    const d = m.phase === 'thin' ? 11 : 19;
+    s += `<mask id="${p}mm"><rect x="${n1(x - 40)}" y="${n1(y - 40)}" width="80" height="80" fill="#fff"/><circle cx="${n1(x + m.side * d * 0.86)}" cy="${n1(y - d * 0.5)}" r="32" fill="#000"/></mask>`;
+    return `${s}<circle cx="${x}" cy="${y}" r="34" fill="#eef2f4" mask="url(#${p}mm)"/>`;
   };
 
   // Soft cloud banks made of radial-gradient ellipses (needs cloudDef with the same id).
@@ -340,7 +371,7 @@
       const t = 0.15 + rnd() * 0.8;
       balls += `M${r(x + (rnd() * 2 - 1) * w * t * 0.75)} ${r(base - h + h * t * 0.9)}h0`;
     }
-    s += `<path d="${balls}" stroke="#d6b261" stroke-width="${n1(Math.max(2.6, h * 0.024))}" stroke-linecap="round" opacity=".9"/>`;
+    s += `<path d="${balls}" stroke="${VAR ? TREE_STYLES[VAR.trees].bauble : '#d6b261'}" stroke-width="${n1(Math.max(2.6, h * 0.024))}" stroke-linecap="round" opacity=".9"/>`;
     const k = h * 0.012;
     s += `<path d="M${r(x)} ${n1(base - h - k * 5)}l${n1(k)} ${n1(k * 3)} ${n1(k * 3)} ${n1(k)} ${n1(-k * 3)} ${n1(k)} ${n1(-k)} ${n1(k * 3)} ${n1(-k)} ${n1(-k * 3)} ${n1(-k * 3)} ${n1(-k)} ${n1(k * 3)} ${n1(-k)}z" fill="#f0d68a"/>`;
     return s;
@@ -370,8 +401,8 @@
       const t = 0.12 + rnd() * 0.85;
       c += `M${r(x + (rnd() * 2 - 1) * w * t * 0.8)} ${r(base - h + h * t * 0.9)}h0`;
     }
-    return glow(p, 'gw', x, base - h * 0.5, w * 1.2, h * 0.62, 0.32)
-      + `<path d="${c}" stroke="#ffe7a8" stroke-width="${n1(Math.max(2, h * 0.016))}" stroke-linecap="round"/>`;
+    return glow(p, VAR ? TREE_STYLES[VAR.trees].glow : 'gw', x, base - h * 0.5, w * 1.2, h * 0.62, 0.32)
+      + `<path d="${c}" stroke="${VAR ? TREE_STYLES[VAR.trees].light : '#ffe7a8'}" stroke-width="${n1(Math.max(2, h * 0.016))}" stroke-linecap="round"/>`;
   };
 
 
@@ -533,7 +564,7 @@
     d += `<rect width="1600" height="900" fill="url(#${p}sky)"/>`;
     if (mode === 0) d += P.stars(rnd, 160, 0, 0, 1600, 520, 1.7);
     if (dawn) d += P.stars(rnd, 30, 0, 0, 1600, 200, 1.3, 0.5) + glow(p, 'gw', 640, 590, 620, 300, 0.95);
-    if (mode === 0) d += `${glow(p, 'gc', 1290, 130, 170)}<circle cx="1290" cy="130" r="34" fill="#eef2f4"/><circle cx="1305" cy="121" r="31" fill="#0a1424"/>`;
+    if (mode === 0) d += P.moon(p, true);
     // haze behind the castle so the silhouette reads
     d += glow(p, dawn ? 'gw' : 'gc', 1040, 470, 560, 230, dawn ? 0.5 : 0.75);
     d += P.ridge(560, 130, dawn ? '#5a4862' : '#121c2a', 4);
@@ -577,7 +608,7 @@
     const p = uid();
     const rnd = prng(44);
     let d = `<defs>${glowDefs(p)}${lin(`${p}sky`, [[0, '#050a14'], [0.55, '#122236'], [1, '#2c405a']])}${lin(`${p}sn`, [[0, '#55708a'], [1, '#16212c']])}${P.cloudDef(`${p}cl`, '#9fb4c8', 0.12)}</defs>`;
-    d += `<rect width="1600" height="900" fill="url(#${p}sky)"/>${P.stars(rnd, 130, 0, 0, 1600, 460, 1.6)}`;
+    d += `<rect width="1600" height="900" fill="url(#${p}sky)"/>${P.stars(rnd, 130, 0, 0, 1600, 460, 1.6)}${P.moon(p)}`;
     d += glow(p, 'gc', 470, 330, 380, 160, 0.7);
     d += P.ridge(470, 90, '#101a28', 12);
     d += P.castle(rnd, 470, 384, 0.5, '#04070b', '#ffbf66');
@@ -667,7 +698,7 @@
     const p = uid();
     const rnd = prng(71);
     let d = `<defs>${glowDefs(p)}${lin(`${p}sky`, [[0, '#04070c'], [0.6, '#0e1824'], [1, '#1e2c3c']])}${lin(`${p}rd`, [[0, '#26323e'], [1, '#4a5a68']])}</defs>`;
-    d += `<rect width="1600" height="900" fill="url(#${p}sky)"/>${P.stars(rnd, 70, 0, 0, 1600, 300, 1.3, 0.7)}`;
+    d += `<rect width="1600" height="900" fill="url(#${p}sky)"/>${P.stars(rnd, 70, 0, 0, 1600, 300, 1.3, 0.7)}${P.moon(p)}`;
     d += P.ridge(470, 160, '#0c141e', 3) + P.ridge(540, 70, '#0a1018', 6);
     d += `<path d="M260 900L770 560H830L1340 900Z" fill="url(#${p}rd)"/>`;
     // cottages receding along both sides of the street
@@ -692,7 +723,7 @@
     const p = uid();
     const rnd = prng(83);
     let d = `<defs>${glowDefs(p)}${lin(`${p}sky`, [[0, '#060a12'], [0.55, '#18263a'], [1, '#34465c']])}${lin(`${p}eng`, [[0, '#8a2220'], [1, '#2e0a0a']])}</defs>`;
-    d += `<rect width="1600" height="900" fill="url(#${p}sky)"/>${P.stars(rnd, 60, 0, 0, 1600, 240, 1.3, 0.6)}`;
+    d += `<rect width="1600" height="900" fill="url(#${p}sky)"/>${P.stars(rnd, 60, 0, 0, 1600, 240, 1.3, 0.6)}${P.moon(p)}`;
     d += P.ridge(430, 170, '#1a2636', 15) + P.ridge(470, 70, '#121c28', 16);
     d += P.pine(rnd, 80, 610, 280, '#04070a', 0.35) + P.pine(rnd, 190, 610, 200, '#04070a', 0.35) + P.pine(rnd, 1540, 610, 300, '#04070a', 0.35);
     // carriages with lit windows, the engine leaving to the right
@@ -1422,9 +1453,11 @@
     const defs = glowDefs(p) + linU(`${p}b`, body) + linU(`${p}r`, rimS)
       + rad(`${p}h`, [[0, o.haloCol || rim, o.ghost ? 0.26 : 0.13], [1, o.haloCol || rim, 0]]) + (o.defs || '');
     const halo = `<ellipse cx="${o.hx || w / 2}" cy="${o.hy || 240}" rx="${o.hrx || w * 0.5}" ry="${o.hry || 170}" fill="url(#${p}h)"/>`;
-    return `<defs>${defs}<g id="${p}s">${o.parts}</g></defs>${halo}${o.before || ''}`
-      + `<use href="#${p}s" fill="none" stroke="url(#${p}r)" stroke-width="${o.rimW || 5}" stroke-linejoin="round"/>`
-      + `<use href="#${p}s" fill="url(#${p}b)"/>${o.after || ''}`;
+    // Key light: the side facing the middle of the screen is lit, so the figure reads against dark rooms.
+    const key = o.ghost ? '' : `<linearGradient id="${p}k" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stops([[0, rim, 0.34], [0.45, rim, 0.12], [0.75, rim, 0]])}</linearGradient>`;
+    return `<defs>${defs}${key}<g id="${p}s">${o.parts}</g></defs>${halo}${o.before || ''}`
+      + `<use href="#${p}s" fill="none" stroke="url(#${p}r)" stroke-width="${o.rimW || 7}" stroke-linejoin="round"/>`
+      + `<use href="#${p}s" fill="url(#${p}b)"/>${key ? `<use href="#${p}s" fill="url(#${p}k)"/>` : ''}${o.after || ''}`;
   }
 
   const CH = {};
@@ -1433,6 +1466,7 @@
   const COLD = '#a9c4d6';
 
   CH.mcgonagall = {
+    eyes: [[95, 134], [107, 134]], eyeR: 1.5, eyeCol: '#eef4f6',
     draw: (p) => fig(p, {
       tint: ['#1d3c30', '#04080a'], rim: GOLD,
       parts: '<path d="M80 118Q92 96 96 68Q99 46 112 36Q107 56 108 74Q112 100 122 118Z"/><ellipse cx="101" cy="120" rx="38" ry="7"/>'
@@ -1447,6 +1481,7 @@
   };
 
   CH.dumbledore = {
+    eyes: [[95.5, 120], [106.5, 120]], eyeR: 1.5, eyeCol: '#dfeaf6',
     draw: (p) => fig(p, {
       tint: ['#2e2046', '#06050c'], rim: '#e8dcc0',
       defs: linU(`${p}bd`, [[0, '#eef2f4'], [1, '#8a949c']], 110, 280),
@@ -1463,6 +1498,7 @@
   };
 
   CH.hagrid = {
+    eyes: [[93, 64], [107, 64]], eyeR: 2.0, eyeCol: '#f2e4c4',
     draw: (p) => fig(p, {
       tint: ['#3e2c1c', '#0a0705'], rim: GOLD, hy: 220, hry: 200,
       parts: `${shag(100, 70, 50, 60, 22, 0.28, 3)}`
@@ -1477,6 +1513,7 @@
   };
 
   CH.piton = {
+    eyes: [[93, 74], [102, 74]], eyeR: 1.4, eyeCol: '#e4e8ea',
     draw: (p) => fig(p, {
       tint: ['#16161a', '#030304'], rim: COLD,
       parts: '<path d="M76 104Q40 180 30 260Q22 320 6 396H70L72 140Z"/>'
@@ -1489,6 +1526,7 @@
   };
 
   CH.frics = {
+    eyes: [[67, 130], [76, 130]], eyeR: 1.5, eyeCol: '#efe2c8',
     draw: (p) => fig(p, {
       tint: ['#2e2a22', '#070605'], rim: '#ffcf8a', hx: 70, hy: 250,
       parts: '<ellipse cx="72" cy="132" rx="13" ry="15"/>'
@@ -1503,6 +1541,7 @@
   };
 
   CH.flitwick = {
+    eyes: [[94, 211], [105, 211]], eyeR: 1.6, eyeCol: '#eef4f6',
     draw: (p) => fig(p, {
       tint: ['#232842', '#06070c'], rim: GOLD, hy: 260, hry: 120,
       parts: '<ellipse cx="100" cy="214" rx="15" ry="17"/><path d="M88 230Q100 226 112 230Q124 238 126 260L130 322H70L74 260Q76 238 88 230Z"/>'
@@ -1516,6 +1555,7 @@
   };
 
   CH.pomfrey = {
+    eyes: [[95, 90], [104, 90]], eyeR: 1.4, eyeCol: '#eef4f6',
     draw: (p) => fig(p, {
       tint: ['#2a2444', '#07060c'], rim: '#e8dcc0',
       parts: '<ellipse cx="100" cy="92" rx="13" ry="16"/>'
@@ -1528,6 +1568,7 @@
   };
 
   CH.bellatrix = {
+    eyes: [[93, 85], [102, 85]], eyeR: 1.5, eyeCol: '#f6dada',
     draw: (p) => fig(p, {
       tint: ['#1a141e', '#030204'], rim: '#d89a9a',
       parts: `${curls(98, 84, 30, 34, 16, 10, 17, 21)}${curls(84, 132, 12, 18, 5, 7, 11, 23)}${curls(114, 130, 10, 16, 5, 7, 10, 29)}`
@@ -1557,6 +1598,7 @@
   };
 
   CH.aberforth = {
+    eyes: [[75, 94], [84, 94]], eyeR: 1.5, eyeCol: '#dfeaf6',
     draw: (p) => fig(p, {
       tint: ['#2c2c28', '#070706'], rim: GOLD, hx: 92,
       defs: linU(`${p}bd`, [[0, '#c8ccd0'], [1, '#6a7076']], 90, 240),
@@ -1588,6 +1630,7 @@
   };
 
   CH.nick = {
+    eyes: [[103, 126], [112, 126]], eyeR: 1.4, eyeCol: '#f4f9fd',
     anim: 'art-c--float', halo: 'rgba(200,225,245,.28)',
     draw: (p) => fig(p, {
       ghost: true, hy: 220,
@@ -1752,6 +1795,7 @@
   };
 
   CH['kover-dama'] = {
+    eyes: [[112, 162], [128, 162]], eyeR: 2.0, eyeCol: '#3a2418',
     w: 240, facing: 'front',
     draw: (p) => {
       const defs = glowDefs(p) + linU(`${p}fr`, [[0, '#f0d080'], [0.5, '#a07a30'], [1, '#5a4018']], 40, 370) + linU(`${p}dr`, [[0, '#d88aa8'], [1, '#7a3050']], 150, 340);
@@ -1952,6 +1996,7 @@
   const S = (bg, chars = [], fx = [], extra = {}) => Object.assign({ bg, chars, fx }, extra);
   CE.SCENE_ART = {
     // Prologue
+    P0: S('roxfort', [], ['snow']),
     P1: S('roxfort', ['mcgonagall'], ['snow']),
     P2: S('tanterem', [], ['silver-wave']),
     P3: S('nagyterem', []),
@@ -2036,13 +2081,216 @@
   };
   const DEFAULT_ART = S('nagyterem', []);
 
+  // ---------- per-game variation ----------
+  // setVariant(seed) picks one look per game: a mood tint, the snowfall, the moon, the Great Hall tree
+  // style, a few Christmas decorations, an alternative (equally fitting) background for some scenes and
+  // an optional canonical background figure in some empty scenes. Same seed → same look.
+
+  // Scenes where another existing background fits the place in the story equally well (first = default).
+  const ALT_BG = {
+    P1: ['roxfort', 'park'], // "Roxfort, december"
+    'II-0': ['halo', 'nagyterem'], // "Hálóterem, majd a Nagy Terem"
+    'II-2': ['lepcso', 'folyoso'], // "A kastély"
+    'II-2t': ['folyoso', 'folyoso-sotet'], // "Valahol a kastélyban" (dementor)
+    E2: ['nagyterem-hajnal', 'hajnal'],
+    E3: ['nagyterem-hajnal', 'hajnal'],
+    E4: ['hajnal', 'nagyterem-hajnal']
+  };
+  // Optional background figure (null = nobody). Only canonical castle residents, only in scenes that have
+  // no figure of their own: Nearly Headless Nick (Gryffindor ghost, at the feasts), Mrs Norris on patrol.
+  const EXTRA_CHARS = {
+    P3: [null, null, 'nick'],
+    P4b: [null, 'nick'],
+    'I-X3': [null, null, 'nick'],
+    'II-6': [null, null, 'nick'],
+    'II-SPLIT': [null, 'mrs-norris', 'nick']
+  };
+  const MOODS = ['night', 'moon', 'dusk', 'candle'];
+  // Backgrounds with a strong colour story of their own get no mood tint.
+  const NO_MOOD = ['nagyterem-ego', 'nagyterem-hajnal', 'hajnal', 'sotet-jegy'];
+
+  // 32-bit hash finaliser, so neighbouring seeds (1, 2, 3…) give unrelated looks.
+  const mix32 = (v) => {
+    let h = v >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    return (h ^ (h >>> 16)) >>> 0;
+  };
+
+  function setVariant(seed) {
+    const n = Number(seed);
+    if (seed === null || seed === undefined || seed === '' || !Number.isFinite(n)) {
+      VAR = null;
+      return null;
+    }
+    const rnd = prng(mix32(Math.floor(n) ^ 0x2545f491));
+    const pick = (list) => list[Math.floor(rnd() * list.length)];
+    const v = {
+      seed: Math.floor(n),
+      mood: pick(MOODS),
+      weather: pick(['light', 'normal', 'normal', 'heavy']),
+      moon: { phase: pick(['thin', 'crescent', 'crescent', 'full']), x: 1160 + rnd() * 250, y: 96 + rnd() * 64, side: rnd() < 0.5 ? -1 : 1, show: rnd() < 0.6 },
+      trees: pick(Object.keys(TREE_STYLES)),
+      decor: { wreath: rnd() < 0.65, garland: rnd() < 0.6, stockings: rnd() < 0.6, candles: rnd() < 0.6, sill: rnd() < 0.7 },
+      bg: {},
+      extra: {}
+    };
+    Object.keys(ALT_BG).forEach((id) => { v.bg[id] = pick(ALT_BG[id]); });
+    Object.keys(EXTRA_CHARS).forEach((id) => { v.extra[id] = pick(EXTRA_CHARS[id]); });
+    VAR = v;
+    return getVariant();
+  }
+  // A copy of the current variant (null when none), for debugging and the gallery page.
+  const getVariant = () => (VAR ? JSON.parse(JSON.stringify(VAR)) : null);
+
+  // Decoration pieces (viewBox 0 0 1600 900).
+  const HOLLY = '#1d4634';
+  const BERRY = '#b83030';
+  const wreath = (x, y, r) => {
+    const w = r * 0.44;
+    let berries = '';
+    for (let i = 0; i < 6; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 3 + 0.3;
+      berries += `M${n1(x + Math.cos(a) * r)} ${n1(y + Math.sin(a) * r)}h0`;
+    }
+    return `<circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(r)}" fill="none" stroke="#12301f" stroke-width="${n1(w)}"/>`
+      + `<circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(r)}" fill="none" stroke="#2e6a48" stroke-width="${n1(w * 0.55)}" stroke-dasharray="${n1(r * 0.34)} ${n1(r * 0.22)}" opacity=".8"/>`
+      + `<path d="${berries}" stroke="${BERRY}" stroke-width="${n1(r * 0.17)}" stroke-linecap="round"/>`
+      + `<path d="M${n1(x)} ${n1(y + r)}l${n1(-r * 0.42)} ${n1(-r * 0.22)}v${n1(r * 0.44)}zM${n1(x)} ${n1(y + r)}l${n1(r * 0.42)} ${n1(-r * 0.22)}v${n1(r * 0.44)}z" fill="#a82a2a"/>`
+      + `<path d="M${n1(x - r * 0.06)} ${n1(y + r)}l${n1(-r * 0.2)} ${n1(r * 0.62)}M${n1(x + r * 0.06)} ${n1(y + r)}l${n1(r * 0.2)} ${n1(r * 0.62)}" stroke="#a82a2a" stroke-width="${n1(r * 0.12)}" stroke-linecap="round"/>`;
+  };
+  // Holly rope between two points, sagging in the middle, a berry cluster at the lowest point.
+  const garland = (x1, y1, x2, y2, sag, w) => {
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2 + sag;
+    const d = `M${n1(x1)} ${n1(y1)}Q${n1(mx)} ${n1(my + sag)} ${n1(x2)} ${n1(y2)}`;
+    return `<path d="${d}" fill="none" stroke="${HOLLY}" stroke-width="${n1(w)}" stroke-linecap="round"/>`
+      + `<path d="${d}" fill="none" stroke="#2e6a48" stroke-width="${n1(w * 0.45)}" stroke-dasharray="${n1(w * 0.9)} ${n1(w * 0.8)}" opacity=".7"/>`
+      + `<path d="M${n1(mx - w * 0.5)} ${n1(my)}h0M${n1(mx + w * 0.5)} ${n1(my)}h0M${n1(mx)} ${n1(my + w * 0.5)}h0" stroke="${BERRY}" stroke-width="${n1(w * 0.75)}" stroke-linecap="round"/>`;
+  };
+  // Christmas stocking hanging from (x, y), toe to the right.
+  const stocking = (x, y, s, col) => `<g transform="translate(${n1(x)} ${n1(y)}) scale(${s})"><path d="M-11 0h22v42q0 8 8 12l12 6q8 5 2 12q-6 5 -15 1l-24 -11q-9 -5 -9 -14z" fill="${col}"/><rect x="-13" y="-2" width="26" height="11" rx="3" fill="#e8e2d4"/></g>`;
+  // Candle standing on y: [body, flame + glow for a flicker layer].
+  const candle = (p, x, y, h) => [
+    `<rect x="${n1(x - 5)}" y="${n1(y - h)}" width="10" height="${n1(h)}" rx="2" fill="#e9dfc6"/>`,
+    `${glow(p, 'gw', x, y - h - 6, 70, 70, 0.75)}${P.flame(x, y - h - 1, 1.3)}`
+  ];
+  // Snow drift on a window sill.
+  const sill = (x, y, w) => `<path d="M${n1(x - 6)} ${n1(y + 2)}q${n1(w * 0.25)} -14 ${n1(w * 0.5 + 6)} -12q${n1(w * 0.3)} -2 ${n1(w * 0.5 + 6)} 12z" fill="#dbe6ef" opacity=".75"/>`;
+
+  // Corridor helper: the same projection as corridor() (vanishing point 800, 440).
+  const cpr = (X, Y, z) => [800 + (X - 800) / (1 + z), 440 + (Y - 440) / (1 + z)];
+  function corridorDecor(o) {
+    const dc = VAR.decor;
+    let s = '';
+    if (dc.garland) {
+      const ribs = o.ribs || [0.35, 0.9, 1.6, 2.4];
+      for (let i = 0; i < ribs.length - 1; i++) {
+        [0, 1600].forEach((X) => {
+          const a = cpr(X, 222, ribs[i]);
+          const b = cpr(X, 222, ribs[i + 1]);
+          s += garland(a[0], a[1], b[0], b[1], 26 / (1 + ribs[i]), 16 / (1 + ribs[i]));
+        });
+      }
+    }
+    if (dc.wreath) {
+      (o.wreathSides || [0, 1600]).forEach((X) => {
+        const z = o.wreathZ || 0.9;
+        const [x, y] = cpr(X, 440, z);
+        s += wreath(x, y, 44 / (1 + z));
+      });
+    }
+    return [s, ''];
+  }
+
+  // Decorations per background: (p) => [static svg, flickering svg]. Only drawn with a variant.
+  const DECOR = {
+    nagyterem: () => [VAR.decor.wreath ? wreath(800, 288, 30) : '', ''],
+    folyoso: () => corridorDecor({}),
+    'harmadik-emelet': () => corridorDecor({ wreathSides: [0] }),
+    vizkopo: () => corridorDecor({ wreathSides: [0] }),
+    szukseg: () => corridorDecor({ ribs: [1.2, 2.2], wreathSides: [] }),
+    lepcso: () => {
+      if (!VAR.decor.garland) return ['', ''];
+      let s = '';
+      // swags hanging from the hand rails of the three fixed flights
+      [[300, 260, 620, 80], [980, 80, 1300, 170], [380, 600, 760, 820]].forEach(([x1, y1, x2, y2]) => {
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        s += garland(x1, y1, mx, my, 12, 9) + garland(mx, my, x2, y2, 12, 9);
+      });
+      return [s, ''];
+    },
+    kapu: () => [VAR.decor.wreath ? wreath(690, 340, 42) + wreath(910, 340, 42) : '', ''],
+    klubhelyiseg: (p) => {
+      const dc = VAR.decor;
+      let s = '';
+      let fl = '';
+      if (dc.stockings) {
+        [[312, '#8a1e1e'], [404, '#1d5a3a'], [516, '#8a1e1e'], [608, '#9a7a2a']].forEach(([x, col]) => { s += stocking(x, 318, 0.95, col); });
+      }
+      if (dc.candles) {
+        [252, 668].forEach((x) => { const c = candle(p, x, 290, 34); s += c[0]; fl += c[1]; });
+      }
+      return [s, fl];
+    },
+    halo: () => [(VAR.decor.sill ? sill(680, 510, 240) : '') + (VAR.decor.wreath ? wreath(800, 330, 26) : ''), ''],
+    tanterem: () => [VAR.decor.sill ? '<path d="M56 602q60 -16 118 -42v8q-58 28 -118 42z" fill="#dbe6ef" opacity=".6"/>' : '', ''],
+    kunyho: (p) => {
+      const dc = VAR.decor;
+      let s = '';
+      let fl = '';
+      if (dc.garland) s += garland(944, 352, 1140, 352, 10, 12) + garland(1140, 352, 1336, 352, 10, 12);
+      if (dc.candles) { const c = candle(p, 700, 700, 30); s += c[0]; fl += c[1]; }
+      return [s, fl];
+    }
+  };
+
+  // Variant pass over a background's layer list: decorations, mood tint, snowfall.
+  function variantLayers(k, list) {
+    if (!VAR) return { list, cls: '' };
+    let out = list.slice();
+    const q = uid();
+    const dec = DECOR[k] ? DECOR[k](q) : null;
+    if (dec && (dec[0] || dec[1])) {
+      // static decorations sit right on the base picture, flames go to their own flickering layer
+      const add = [];
+      if (dec[0]) add.push(layer(dec[0]));
+      if (dec[1]) add.push(layer(`<defs>${glowDefs(q)}</defs>${dec[1]}`, 'art-flicker'));
+      out.splice(1, 0, ...add);
+    }
+    let cls = '';
+    if (VAR.weather === 'heavy') {
+      // a third, large-flake layer on every snowfall of the background (not on dust, ash or embers)
+      out = out.map((l) => (/\bart-snow\b/.test(l) && !/art-flakes--c/.test(l) && /art-flakes--a/.test(l)
+        ? l.replace(/(<i class="art-flakes art-flakes--a"><\/i>)<\/div>$/, '$1<i class="art-flakes art-flakes--c"></i></div>') : l));
+      cls += ' art-wx--heavy';
+    } else if (VAR.weather === 'light') cls += ' art-wx--light';
+    if (VAR.mood !== 'night' && !NO_MOOD.includes(k)) out.push(`<div class="art-mood art-mood--${VAR.mood}"></div>`);
+    return { list: out, cls };
+  }
+
+  // Applies the per-game background swap and background figure to a scene's art entry.
+  function varied(id, a) {
+    if (!VAR || !a) return a;
+    const bg = VAR.bg[id];
+    const extra = VAR.extra[id];
+    if (!(bg && bg !== a.bg) && !extra) return a;
+    const out = Object.assign({}, a);
+    if (bg) out.bg = bg;
+    const chars = a.chars || [];
+    if (extra && CH[extra] && chars.length < 3 && !chars.includes(extra)) out.chars = chars.concat(extra);
+    return out;
+  }
+
   // ---------- public API ----------
   // Effects that tint the whole picture go under the figures; particles and flashes go over them.
   const FX_UNDER = ['dementor-cold', 'dawn'];
 
   function background(key) {
     const k = BG[key] ? key : 'nagyterem';
-    return `<div class="art-bg art-bg--${k}" data-bg="${k}">${BG[k]().join('')}<div class="art-scrim"></div></div>`;
+    const v = variantLayers(k, BG[k]());
+    return `<div class="art-bg art-bg--${k}${v.cls}" data-bg="${k}">${v.list.join('')}<div class="art-scrim"></div></div>`;
   }
 
   function character(id, opts = {}) {
@@ -2050,9 +2298,13 @@
     if (!c) return '';
     const p = uid();
     const w = c.w || 200;
-    const inner = c.draw(p, opts);
+    // Blinking eye glints, each figure on its own rhythm.
+    const rnd = prng(hashStr(`${id}:${p}`));
+    const eyes = c.eyes ? `<g class="art-eyes" style="animation-duration:${(4.5 + rnd() * 3).toFixed(2)}s;animation-delay:-${(rnd() * 5).toFixed(2)}s" fill="${c.eyeCol || '#eef4f6'}">${c.eyes.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${c.eyeR || 1.5}"/>`).join('')}</g>` : '';
+    const inner = c.draw(p, opts) + eyes;
     const body = opts.flip ? `<g transform="translate(${w} 0) scale(-1 1)">${inner}</g>` : inner;
-    return `<svg class="art-char art-char--${id} ${c.anim || 'art-c--breathe'}" viewBox="0 0 ${w} 400" width="${w}" height="400" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">${body}</svg>`;
+    const timing = `animation-duration:${(4.6 + rnd() * 2.4).toFixed(2)}s;animation-delay:-${(rnd() * 4).toFixed(2)}s`;
+    return `<svg style="${timing}" class="art-char art-char--${id} ${c.anim || 'art-c--breathe'}" viewBox="0 0 ${w} 400" width="${w}" height="400" preserveAspectRatio="xMidYMax meet" aria-hidden="true" focusable="false">${body}</svg>`;
   }
 
   // Up to three figures: one → right edge; two → left + right; three → left, right, inner right.
@@ -2066,6 +2318,26 @@
       const style = c.halo ? ` style="--halo:${c.halo}"` : '';
       return `<div class="${cls}" data-char="${id}"${style}>${character(id, { flip: slots[i] === 'l' && c.facing !== 'front' })}</div>`;
     }).join('')}</div>`;
+  }
+
+  const NAMES = {
+    mcgonagall: /McGonagall/, dumbledore: /Dumbledore(?! irod)/, hagrid: /Hagrid/, piton: /Piton/, frics: /Frics/,
+    flitwick: /Flitwick/, pomfrey: /Pomfrey/, bellatrix: /Bellatrix/, fenrir: /Fenrir|Greyback/, aberforth: /Aberforth/,
+    myrtle: /Myrtle/, nick: /Nick\b/, hoborc: /Hóborc/, dementor: /dementor|rongyos alak/i, fawkes: /Fawkes|főnix/i,
+    'mrs-norris': /Mrs\. Norris/, 'kover-dama': /Kövér Dáma/, halalfalo: /halálfaló/i, thesztral: /thesztrál/i, agyar: /Agyar/,
+    akromantula: /akromantula|pók/i, pancel: /páncél/i, sas: /sas\b/i, suveg: /Teszlek Süveg|süveg/i, kard: /kard/i
+  };
+
+  // Highlights the figures the given text mentions (they light up and lean in); the others dim a little.
+  function spotlight(root, text) {
+    if (!root || typeof document === 'undefined') return [];
+    const slots = [...root.querySelectorAll('.art-slot[data-char]')];
+    const hit = slots.filter((s) => NAMES[s.dataset.char] && NAMES[s.dataset.char].test(text || ''));
+    slots.forEach((s) => {
+      s.classList.toggle('art-speaking', hit.includes(s));
+      s.classList.toggle('art-quiet', hit.length > 0 && !hit.includes(s));
+    });
+    return hit.map((s) => s.dataset.char);
   }
 
   function patronus(animal, opts = {}) {
@@ -2101,7 +2373,7 @@
     return node;
   }
 
-  const forScene = (id) => CE.SCENE_ART[id] || CE.EVENT_ART[id] || DEFAULT_ART;
+  const forScene = (id) => varied(id, CE.SCENE_ART[id] || CE.EVENT_ART[id] || DEFAULT_ART);
   const forEnding = (key) => CE.ENDING_ART[key] || S('hajnal', []);
   const forEvent = (id) => CE.EVENT_ART[id] || S(null, []);
 
@@ -2116,7 +2388,8 @@
   }
 
   CE.art = {
-    background, character, characters, patronus, effect, play, player, forScene, forEnding, forEvent, scene,
+    background, character, characters, patronus, effect, play, player, forScene, forEnding, forEvent, scene, spotlight, NAMES,
+    setVariant, getVariant,
     BACKGROUNDS: Object.keys(BG),
     CHARACTERS: Object.keys(CH),
     PATRONUSES: Object.keys(PAT),
